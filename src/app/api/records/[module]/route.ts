@@ -36,7 +36,7 @@ export async function GET(
       d.count({ where }),
     ]);
     return Response.json({
-      rows: rows.map((row) => safeRecord(name, row)),
+      rows: rows.map((row) => safeRecord(name, row, user)),
       total,
       page,
       limit,
@@ -51,8 +51,11 @@ export async function POST(
     csrf(req);
     const name = collection((await ctx.params).module);
     const user = await authorizeResource(name, true);
-    return Response.json(await save(name, await json(req), user), {
-      status: 201,
-    });
+    return Response.json(
+      safeRecord(name, await save(name, await json(req), user), user),
+      {
+        status: 201,
+      },
+    );
   });
 }

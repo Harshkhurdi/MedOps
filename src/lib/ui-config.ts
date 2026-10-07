@@ -1,3 +1,4 @@
+import { serviceConfigs } from "./service-operations";
 import { controlConfigs } from "./controls";
 import { commercialConfigs, historicalFields } from "./commercial-config";
 export type Field = {
@@ -58,6 +59,7 @@ const orderItems: Field[] = [
 export const configs: Record<string, ModuleConfig> = {
   ...commercialConfigs,
   ...controlConfigs,
+  ...serviceConfigs,
   company: {
     title: "Company profile",
     description:
@@ -240,6 +242,7 @@ export const configs: Record<string, ModuleConfig> = {
         "CHECKLIST",
         "DELIVERY_CHALLAN",
         "PACKING_LIST",
+        "SERVICE_REPORT",
         "INSTALLATION_REPORT",
         "COMMISSIONING_REPORT",
         "HANDOVER",
@@ -322,16 +325,40 @@ export const configs: Record<string, ModuleConfig> = {
     ],
   },
   equipment: {
-    title: "Equipment serial numbers",
+    title: "Installed base",
+    createLabel: "Register Equipment",
     description:
       "Register each received unit before tracking installation, warranty or maintenance.",
     columns: ["serialNumber", "customer", "orderItem", "delivery"],
     fields: [
       f("serialNumber", "Serial number", "text", true),
-      rel("deliveryId", "Confirmed delivery", "deliveries"),
-      rel("orderId", "Purchase order", "orders"),
-      rel("orderItemId", "Order item", "orderItems"),
+      rel(
+        "deliveryId",
+        "Confirmed delivery (optional for historical)",
+        "deliveries",
+        false,
+      ),
+      rel(
+        "orderId",
+        "Purchase order (optional for historical)",
+        "orders",
+        false,
+      ),
+      rel(
+        "orderItemId",
+        "Order item (optional for historical)",
+        "orderItems",
+        false,
+      ),
       rel("customerId", "Customer", "customers"),
+      rel("manufacturerId", "Manufacturer", "manufacturers", false),
+      rel("productId", "Saved product", "products", false),
+      f("productName", "Equipment/product"),
+      f("model", "Model"),
+      f("location", "Hospital location"),
+      f("department", "Department"),
+      notes,
+      ...historicalFields,
     ],
   },
   installations: {
@@ -355,9 +382,11 @@ export const configs: Record<string, ModuleConfig> = {
       f("commissioningDate", "Commissioning date", "date"),
       f("acceptanceDate", "Customer acceptance date", "date"),
       notes,
+      ...historicalFields,
     ],
   },
   warranties: {
+    createLabel: "New Warranty",
     title: "Warranty management",
     description:
       "Expiry is calculated from the confirmed commencement event in the contract.",
@@ -370,19 +399,25 @@ export const configs: Record<string, ModuleConfig> = {
     ],
     files: true,
     fields: [
+      { ...f("type", "Warranty type", "text", true), default: "STANDARD" },
       rel("equipmentId", "Equipment", "equipment"),
       f("commencement", "Contractual start event", "select", true, [
         "DELIVERY",
         "INSTALLATION",
         "COMMISSIONING",
         "ACCEPTANCE",
+        "CONTRACT",
       ]),
       f("durationMonths", "Warranty duration (months)", "number", true),
+      f("startDate", "Explicit contract / historical start date", "date"),
+      f("endDate", "Historical end date (optional)", "date"),
       f("terms", "Warranty terms", "textarea", true),
       notes,
+      ...historicalFields,
     ],
   },
   amcs: {
+    createLabel: "New AMC",
     title: "AMC management",
     description:
       "Contracts, covered devices, preventive maintenance and renewals.",

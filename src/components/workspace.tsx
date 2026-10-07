@@ -1,4 +1,5 @@
 "use client";
+import EquipmentHistory from "./equipment-history";
 import ControlSummary from "./control-summary";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -56,12 +57,29 @@ const groups: Record<string, [string, string][]> = {
   ],
   deliveries: [
     ["deliveries", "Dispatch & delivery"],
-    ["equipment", "Serial numbers"],
+    ["equipment", "Installed base"],
     ["installations", "Installations"],
+  ],
+  tickets: [
+    ["tickets", "Service tickets"],
+    ["ticket-visits", "Engineer visits"],
+    ["engineer", "Engineer home"],
+    ["service-sla", "Service SLA"],
+    ["sla-rules", "SLA rules"],
+  ],
+  parts: [
+    ["parts", "Spare parts"],
+    ["inventory", "Stock transactions"],
+  ],
+  consumables: [
+    ["consumables", "Catalogue"],
+    ["compatibility", "Approved compatibility"],
+    ["consumable-opportunities", "Opportunities"],
   ],
   amcs: [
     ["amcs", "Contracts"],
-    ["visits", "Service visits"],
+    ["visits", "Maintenance visits"],
+    ["amc-opportunities", "AMC opportunities"],
   ],
   invoices: [
     ["invoices", "Invoices"],
@@ -247,10 +265,32 @@ export default function Workspace({
     return () => clearTimeout(timer);
   }, [load]);
   useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("record");
+    if (!id) return;
+    const c = new AbortController();
+    fetch(`/api/records/${module}/${encodeURIComponent(id)}`, {
+      signal: c.signal,
+    })
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        setDetail(d);
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") setError(e.message);
+      });
+    return () => c.abort();
+  }, [module]);
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search),
       from = params.get("from"),
       id = params.get("id");
-    if (!writable || !id || !from || !["rfqs", "quotes"].includes(module))
+    if (
+      !writable ||
+      !id ||
+      !from ||
+      !["rfqs", "quotes", "tickets", "ticket-visits"].includes(module)
+    )
       return;
     const control = new AbortController();
     fetch(`/api/lookups/${from}?for=${module}&ids=${encodeURIComponent(id)}`, {
@@ -263,6 +303,21 @@ export default function Workspace({
         if (!source) throw new Error("Source record not found");
         const seed: Row = { __new: true };
         if (from === "customers") seed.customerId = id;
+        if (module === "tickets" && from === "equipment")
+          Object.assign(seed, {
+            equipmentId: id,
+            customerId: source.customerId,
+            serialNumber: source.serialNumber,
+            productName: source.productName,
+            manufacturerId: source.manufacturerId,
+            model: source.model,
+            department: source.department,
+          });
+        if (module === "ticket-visits" && from === "tickets")
+          Object.assign(seed, {
+            ticketId: id,
+            engineerId: source.assignedToId,
+          });
         if (from === "tenders")
           Object.assign(seed, {
             tenderId: id,
@@ -347,6 +402,21 @@ export default function Workspace({
             </Button>
           ))}
         </Stack>
+      )}
+      {module === "amc-opportunities" && writable && (
+        <Button
+          variant="outlined"
+          onClick={async () => {
+            const r = await fetch("/api/opportunities/refresh", {
+              method: "POST",
+            });
+            const d = await r.json();
+            if (!r.ok) setError(d.error);
+            else void load();
+          }}
+        >
+          Refresh actual contract opportunities
+        </Button>
       )}
       {module === "securities" && <ControlSummary module="securities" />}
       {module === "tenders" && (
@@ -697,6 +767,12 @@ export default function Workspace({
                   module="checklist"
                   tenderId={String(detail.id)}
                 />
+              )}
+              {module === "equipment" && (
+                <EquipmentHistory id={String(detail.id)} />
+              )}
+              {module === "tickets" && (
+                <EquipmentHistory id={String(detail.id)} coverage />
               )}
               <CommercialActions
                 module={module}

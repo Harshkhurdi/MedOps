@@ -1,3 +1,4 @@
+import { refreshAmcOpportunities } from "./opportunities";
 import { canResource } from "./record-access";
 import { db } from "./db";
 import { addDays, cents } from "./business";
@@ -28,6 +29,7 @@ export function dateReminder(
   };
 }
 export async function runReminders(now = new Date()) {
+  await refreshAmcOpportunities(null, now);
   const reminders: Reminder[] = [];
   const company = await db.companyProfile.findFirst();
   const days = company?.reminderDays ?? 30;
@@ -305,6 +307,83 @@ export async function runReminders(now = new Date()) {
       priority: "NORMAL",
       eligibleUserIds: [a.approverId, a.createdById],
     });
+  for (const t of await db.serviceTicket.findMany({
+    where: { status: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] } },
+  })) {
+    if (t.scheduledVisit)
+      add(
+        dateReminder(
+          "tickets",
+          t.id,
+          `Service visit due: ${t.number}`,
+          t.scheduledVisit,
+          now,
+          days,
+        ),
+      );
+    if (t.priority === "CRITICAL")
+      reminders.push({
+        key: `critical:${t.id}`,
+        module: "tickets",
+        recordId: t.id,
+        title: `Critical service ticket: ${t.number}`,
+        priority: "HIGH",
+      });
+    if (t.resolutionDueAt)
+      add(
+        dateReminder(
+          "tickets",
+          t.id,
+          `Service resolution target: ${t.number}`,
+          t.resolutionDueAt,
+          now,
+          0,
+        ),
+      );
+  }
+  for (const p of await db.sparePart.findMany({ where: { active: true } }))
+    if (p.onHand - p.reserved <= p.reorderLevel)
+      reminders.push({
+        key: `low-stock:${p.id}`,
+        module: "parts",
+        recordId: p.id,
+        title: `Low available stock: ${p.sku}`,
+        priority: "NORMAL",
+      });
+  for (const a of await db.amcOpportunity.findMany({
+    where: {
+      status: { notIn: ["WON", "LOST", "NOT_APPLICABLE"] },
+      followUpDate: { lte: until },
+    },
+  }))
+    if (a.followUpDate)
+      add(
+        dateReminder(
+          "amc-opportunities",
+          a.id,
+          "AMC opportunity follow-up",
+          a.followUpDate,
+          now,
+          days,
+        ),
+      );
+  for (const a of await db.consumableOpportunity.findMany({
+    where: {
+      status: { notIn: ["WON", "LOST", "NOT_APPLICABLE"] },
+      nextFollowUp: { lte: until },
+    },
+  }))
+    if (a.nextFollowUp)
+      add(
+        dateReminder(
+          "consumable-opportunities",
+          a.id,
+          "Consumable opportunity follow-up",
+          a.nextFollowUp,
+          now,
+          days,
+        ),
+      );
   const users = await db.user.findMany({
     where: { active: true },
     include: { permissions: true },

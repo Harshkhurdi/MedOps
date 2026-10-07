@@ -157,6 +157,7 @@ export default function Generator() {
           >
             {[
               ["rfqs", "RFQ"],
+              ["ticket-visits", "Engineer service visit"],
               ["tenders", "Tender"],
               ["deliveries", "Delivery"],
               ["installations", "Installation"],

@@ -38,6 +38,11 @@ const navigation = [
   ["orders", "Purchase orders"],
   ["deliveries", "Deliveries & installations"],
   ["warranties", "Warranty management"],
+  ["equipment", "Installed base"],
+  ["tickets", "Service tickets"],
+  ["engineer", "Engineer home"],
+  ["parts", "Spare parts"],
+  ["consumables", "Consumables"],
   ["amcs", "AMC management"],
   ["invoices", "Payments & receivables"],
   ["documents", "Company documents"],
@@ -169,6 +174,9 @@ export default function Shell({
               size="small"
               onClick={async () => {
                 await fetch("/api/auth/logout", { method: "POST" });
+                for (const key of Object.keys(sessionStorage))
+                  if (key.startsWith("medops-draft:"))
+                    sessionStorage.removeItem(key);
                 router.push("/login");
                 router.refresh();
               }}

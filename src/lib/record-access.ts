@@ -2,7 +2,10 @@ import { authorize, can, type Actor } from "./auth";
 import { AppError } from "./errors";
 export const pricingModules = ["quotes", "comparisons", "results"];
 export function canResource(user: Actor, name: string, write = false) {
-  if (["approval-policies"].includes(name) && user.role !== "ADMIN")
+  if (
+    ["approval-policies", "sla-rules", "compatibility"].includes(name) &&
+    user.role !== "ADMIN"
+  )
     return false;
   return (
     can(user, name, write) &&

@@ -1,4 +1,6 @@
+import { serviceSchemas } from "./service-operations";
 import { controlSchemas } from "./controls";
+import { provenance } from "./commercial";
 import { commercialSchemas } from "./commercial";
 import { z } from "zod";
 const text = z.string().trim().min(1).max(500);
@@ -58,6 +60,7 @@ const orderItem = z
 export const schemas = {
   ...commercialSchemas,
   ...controlSchemas,
+  ...serviceSchemas,
   company: z
     .object({
       legalName: text,
@@ -192,6 +195,7 @@ export const schemas = {
         "CHECKLIST",
         "DELIVERY_CHALLAN",
         "PACKING_LIST",
+        "SERVICE_REPORT",
         "INSTALLATION_REPORT",
         "COMMISSIONING_REPORT",
         "HANDOVER",
@@ -236,10 +240,18 @@ export const schemas = {
   equipment: z
     .object({
       serialNumber: text,
-      orderId: id,
-      orderItemId: id,
-      deliveryId: id,
+      orderId: optionalId,
+      orderItemId: optionalId,
+      deliveryId: optionalId,
       customerId: id,
+      manufacturerId: optionalId,
+      productId: optionalId,
+      productName: notes,
+      model: notes,
+      location: notes,
+      department: notes,
+      notes,
+      ...provenance,
     })
     .strict(),
   installations: z
@@ -252,18 +264,24 @@ export const schemas = {
       commissioningDate: optionalDate,
       acceptanceDate: optionalDate,
       notes,
+      ...provenance,
     })
     .strict(),
   warranties: z
     .object({
+      type: text.default("STANDARD"),
       equipmentId: id,
       commencement: z.enum([
         "DELIVERY",
         "INSTALLATION",
         "COMMISSIONING",
         "ACCEPTANCE",
+        "CONTRACT",
       ]),
       durationMonths: z.coerce.number().int().min(1).max(240),
+      startDate: optionalDate,
+      endDate: optionalDate,
+      ...provenance,
       terms: text,
       notes,
     })

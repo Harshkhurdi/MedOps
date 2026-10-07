@@ -14,6 +14,8 @@ import {
   limitedFormData,
 } from "@/lib/storage";
 const links: Record<string, string> = {
+  tickets: "ticketId",
+  "ticket-visits": "ticketVisitId",
   securities: "securityId",
   rfqs: "rfqId",
   quotes: "quotationId",

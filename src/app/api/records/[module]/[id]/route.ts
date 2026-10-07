@@ -38,7 +38,7 @@ export async function GET(
     if (name === "users") {
       delete row.passwordHash;
     }
-    return Response.json(safeRecord(name, row));
+    return Response.json(safeRecord(name, row, user));
   });
 }
 export async function PATCH(
@@ -81,7 +81,11 @@ export async function PATCH(
         "Reload the record before editing; its version is required",
       );
     return Response.json(
-      await save(name, input, user, id, new Date(expected).toISOString()),
+      safeRecord(
+        name,
+        await save(name, input, user, id, new Date(expected).toISOString()),
+        user,
+      ),
     );
   });
 }

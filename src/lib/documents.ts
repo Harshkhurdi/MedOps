@@ -54,6 +54,10 @@ export const standardTemplates: Record<string, { name: string; body: string }> =
       name: "Packing list draft",
       body: "Purchase order {{po_number}}\nEquipment and quantities: {{items_text}}\nSerial numbers: {{serial_numbers}}\n{{company_name}}",
     },
+    SERVICE_REPORT: {
+      name: "Engineer service report",
+      body: "{{company_name}}\nService report: {{ticket_number}}\nCustomer: {{hospital_name}}\nEquipment: {{equipment_name}} / {{serial_number}}\nIssue: {{reported_issue}}\nVisit: {{visit_date}}\nWork: {{work_done}}\nRepresentative: {{representative}}\nAcknowledgement: {{acknowledgement}}\nNotes: {{report_notes}}",
+    },
     INSTALLATION_REPORT: {
       name: "Installation report draft",
       body: "Customer: {{hospital_name}}\nEquipment: {{equipment_name}}\nSerial: {{serial_numbers}}\nInstallation date: {{installation_date}}\nConfirmed observations: {{report_notes}}\n{{authorized_signatory}}",

@@ -1,3 +1,4 @@
+import { serviceResources } from "./service-operations";
 import { controlResources } from "./controls";
 import { schemas, type Resource } from "./schemas";
 import { commercialResources } from "./commercial";
@@ -68,6 +69,7 @@ const invoiceSummary = {
 export const resources = {
   ...commercialResources,
   ...controlResources,
+  ...serviceResources,
   tasks: {
     model: "task",
     search: ["title", "notes"],
@@ -135,8 +137,10 @@ export const resources = {
   },
   equipment: {
     model: "equipment",
-    search: ["serialNumber"],
+    search: ["serialNumber", "productName", "model", "location", "department"],
     include: {
+      manufacturer: manufacturerSummary,
+      product: { select: { id: true, name: true, model: true } },
       orderItem: itemSummary,
       customer: customerSummary,
       delivery: true,

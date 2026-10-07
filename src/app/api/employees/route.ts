@@ -13,7 +13,12 @@ export async function GET() {
         "users",
         "rfqs",
         "rfq-followups",
-        "securities",
+        "tickets",
+    "ticket-visits",
+    "amc-opportunities",
+    "consumable-opportunities",
+    "inventory",
+    "securities",
         "checklist",
         "approvals",
       ].some((m) => can(user, m))

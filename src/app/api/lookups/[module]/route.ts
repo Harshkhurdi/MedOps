@@ -3,6 +3,29 @@ import { api, AppError } from "@/lib/errors";
 import { currentUser } from "@/lib/auth";
 import { collection, delegate } from "@/lib/resources";
 const selections: Record<string, object> = {
+  "sla-rules": { id: true, name: true, active: true },
+  parts: {
+    id: true,
+    sku: true,
+    name: true,
+    onHand: true,
+    reserved: true,
+    active: true,
+  },
+  consumables: { id: true, name: true, sku: true, active: true },
+  tickets: {
+    id: true,
+    number: true,
+    customerId: true,
+    equipmentId: true,
+    assignedToId: true,
+  },
+  "ticket-visits": {
+    id: true,
+    ticketId: true,
+    scheduledAt: true,
+    workDone: true,
+  },
   rfqs: {
     id: true,
     number: true,
@@ -71,7 +94,16 @@ const selections: Record<string, object> = {
     order: { select: { id: true, customerId: true } },
     items: { select: { orderItemId: true, quantity: true } },
   },
-  equipment: { id: true, serialNumber: true, customerId: true },
+  equipment: {
+    id: true,
+    serialNumber: true,
+    customerId: true,
+    manufacturerId: true,
+    productId: true,
+    productName: true,
+    model: true,
+    department: true,
+  },
   amcs: { id: true, number: true, customerId: true },
   invoices: { id: true, number: true },
   templates: { id: true, name: true, kind: true, approved: true },
@@ -87,6 +119,15 @@ const selections: Record<string, object> = {
   },
 };
 const dependencies: Record<string, string[]> = {
+  tickets: ["customers", "equipment", "manufacturers", "sla-rules"],
+  "ticket-visits": ["tickets"],
+  "sla-rules": ["customers", "manufacturers", "amcs"],
+  "amc-opportunities": ["customers", "equipment", "amcs"],
+  consumables: ["manufacturers"],
+  compatibility: ["products", "consumables"],
+  "consumable-opportunities": ["customers", "equipment", "consumables"],
+  parts: ["manufacturers"],
+  inventory: ["parts", "tickets"],
   securities: ["tenders", "orders", "customers"],
   checklist: ["tenders"],
   approvals: [],
@@ -110,7 +151,7 @@ const dependencies: Record<string, string[]> = {
   requirements: ["tenders"],
   orders: ["tenders", "customers", "manufacturers"],
   deliveries: ["orders"],
-  equipment: ["deliveries", "orders", "customers"],
+  equipment: ["deliveries", "orders", "customers", "manufacturers", "products"],
   installations: ["equipment"],
   warranties: ["equipment"],
   amcs: ["customers", "equipment", "amcs"],
@@ -120,6 +161,11 @@ const dependencies: Record<string, string[]> = {
   followups: ["invoices"],
 };
 const searchFields: Record<string, string> = {
+  tickets: "number",
+  "ticket-visits": "workDone",
+  "sla-rules": "name",
+  parts: "name",
+  consumables: "name",
   rfqs: "number",
   quotes: "number",
   products: "name",

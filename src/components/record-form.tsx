@@ -17,6 +17,19 @@ import { type Field, type ModuleConfig, label } from "@/lib/ui-config";
 type Row = Record<string, unknown>;
 const permissionModules = [
   "pricing",
+  "tickets",
+  "ticket-visits",
+  "sla-rules",
+  "service-sla",
+  "engineer",
+  "amc-opportunities",
+  "consumables",
+  "compatibility",
+  "consumable-opportunities",
+  "parts",
+  "inventory",
+  "inventory-adjust",
+
   "securities",
   "checklist",
   "approvals",
@@ -158,6 +171,7 @@ export function Relation({
       filterOptions={(x) => x}
       isOptionEqualToValue={(a, b) => a.id === b.id}
       getOptionLabel={(r) => label(r)}
+      getOptionKey={(r) => String(r.id)}
       onInputChange={(_, v, reason) => {
         if (reason === "input") setSearch(v);
       }}
@@ -196,6 +210,7 @@ function initial(config: ModuleConfig, row?: Row) {
               : f.type === "custom"
                 ? {}
                 : "");
+    if (f.key === "requestId" && !value) value = crypto.randomUUID();
     if (f.type === "date" && value) value = String(value).slice(0, 10);
     if (f.type === "datetime-local" && value) {
       const d = new Date(String(value));
@@ -225,8 +240,73 @@ export function RecordForm({
   const [values, setValues] = useState<Row>(() => initial(config, row)),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [draftUser, setDraftUser] = useState("");
+  useEffect(() => {
+    if (!["tickets", "ticket-visits"].includes(module)) return;
+    const c = new AbortController();
+    fetch("/api/auth/me", { signal: c.signal })
+      .then((r) => r.json())
+      .then((u) => {
+        if (u.id) setDraftUser(u.id);
+      })
+      .catch(() => {});
+    return () => c.abort();
+  }, [module]);
+  const draftKey = `medops-draft:${draftUser}:${module}:${row?.id ?? "new"}`;
+  function saveDraft() {
+    try {
+      sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({ savedAt: Date.now(), values }),
+      );
+      setError(
+        "Temporary draft saved in this tab. It expires after 24 hours and is cleared on sign-out.",
+      );
+    } catch {
+      setError("This browser cannot retain a temporary draft.");
+    }
+  }
+  function loadDraft() {
+    try {
+      const raw = sessionStorage.getItem(draftKey);
+      if (!raw) {
+        setError("No temporary draft in this tab");
+        return;
+      }
+      const d = JSON.parse(raw);
+      if (Date.now() - d.savedAt > 86400000) {
+        sessionStorage.removeItem(draftKey);
+        setError("Temporary draft expired");
+        return;
+      }
+      if (typeof d.values !== "object" || raw.length > 250000)
+        throw new Error();
+      setValues(d.values);
+      setError("");
+    } catch {
+      setError("Temporary draft could not be read");
+    }
+  }
   async function setField(key: string, value: unknown) {
     setValues((v) => ({ ...v, [key]: value }));
+    if (module === "tickets" && key === "equipmentId" && value) {
+      const r = await fetch(
+        `/api/lookups/equipment?for=tickets&ids=${encodeURIComponent(String(value))}`,
+      );
+      if (r.ok) {
+        const e = (await r.json()).rows[0];
+        if (e)
+          setValues((v) => ({
+            ...v,
+            customerId: e.customerId,
+            serialNumber: e.serialNumber,
+            productName: e.productName ?? "",
+            manufacturerId: e.manufacturerId ?? "",
+            model: e.model ?? "",
+            department: e.department ?? "",
+          }));
+      }
+    }
     if (module === "rfqs" && key === "tenderId" && value) {
       const r = await fetch(
         `/api/lookups/tenders?for=rfqs&ids=${encodeURIComponent(String(value))}`,
@@ -390,6 +470,7 @@ export function RecordForm({
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
+      if (draftUser) sessionStorage.removeItem(draftKey);
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -587,7 +668,16 @@ export function RecordForm({
               ? true
               : undefined,
           },
-          htmlInput: f.type === "number" ? { min: 0, step: "any" } : {},
+          htmlInput:
+            f.type === "number"
+              ? {
+                  min:
+                    module === "inventory" && f.key === "quantity"
+                      ? undefined
+                      : 0,
+                  step: "any",
+                }
+              : {},
         }}
       >
         {f.options?.map((o) => (
@@ -602,6 +692,14 @@ export function RecordForm({
     <form onSubmit={submit}>
       <Stack spacing={2} sx={{ py: 1 }}>
         {error && <Alert severity="error">{error}</Alert>}
+        {draftUser && (
+          <Stack direction="row" spacing={1}>
+            <Button onClick={saveDraft}>
+              Save temporary draft in this tab
+            </Button>
+            <Button onClick={loadDraft}>Restore temporary draft</Button>
+          </Stack>
+        )}
         {config.fields.map((f) => (
           <Box key={f.key}>
             {input(f, values[f.key], (v) => void setField(f.key, v))}

@@ -50,6 +50,7 @@ enum InstallationStatus {
 }
 
 enum WarrantyBasis {
+  CONTRACT
   DELIVERY
   INSTALLATION
   COMMISSIONING
@@ -132,27 +133,36 @@ model CompanyProfile {
 }
 
 model Customer {
-  securities      Security[]
-  id              String          @id @default(cuid())
-  name            String
-  institutionType String?
-  address         String?
-  state           String?
-  email           String?
-  phone           String?
-  contactName     String?
-  notes           String?
-  rfqs            Rfq[]
-  tenders         Tender[]
-  orders          PurchaseOrder[]
-  invoices        Invoice[]
-  equipment       Equipment[]
-  amcs            AmcContract[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  tickets                 ServiceTicket[]
+  amcOpportunities        AmcOpportunity[]
+  consumableOpportunities ConsumableOpportunity[]
+  slaRules                SlaRule[]
+  securities              Security[]
+  id                      String                  @id @default(cuid())
+  name                    String
+  institutionType         String?
+  address                 String?
+  state                   String?
+  email                   String?
+  phone                   String?
+  contactName             String?
+  notes                   String?
+  rfqs                    Rfq[]
+  tenders                 Tender[]
+  orders                  PurchaseOrder[]
+  invoices                Invoice[]
+  equipment               Equipment[]
+  amcs                    AmcContract[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 }
 
 model Manufacturer {
+  installed   Equipment[]
+  tickets     ServiceTicket[]
+  parts       SparePart[]
+  consumables Consumable[]
+  slaRules    SlaRule[]
   id          String                @id @default(cuid())
   name        String                @unique
   email       String?
@@ -171,17 +181,19 @@ model Manufacturer {
 }
 
 model Product {
-  id             String        @id @default(cuid())
+  installed      Equipment[]
+  consumables    ConsumableCompatibility[]
+  id             String                    @id @default(cuid())
   name           String
   model          String
   category       String?
   manufacturerId String
-  manufacturer   Manufacturer  @relation(fields: [manufacturerId], references: [id])
+  manufacturer   Manufacturer              @relation(fields: [manufacturerId], references: [id])
   rfqs           Rfq[]
   quoteSeries    QuoteSeries[]
   specifications String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
 
   @@unique([manufacturerId, model])
 }
@@ -393,26 +405,44 @@ model DeliveryItem {
 }
 
 model Equipment {
-  id           String            @id @default(cuid())
-  serialNumber String            @unique
-  orderId      String
-  order        PurchaseOrder     @relation(fields: [orderId], references: [id])
-  orderItemId  String
-  orderItem    PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
-  deliveryId   String
-  delivery     Delivery          @relation(fields: [deliveryId], references: [id])
-  customerId   String
-  customer     Customer          @relation(fields: [customerId], references: [id])
-  installation Installation?
-  warranties   Warranty[]
-  amcs         AmcEquipment[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  location                String?
+  department              String?
+  manufacturerId          String?
+  manufacturer            Manufacturer?           @relation(fields: [manufacturerId], references: [id])
+  productId               String?
+  product                 Product?                @relation(fields: [productId], references: [id])
+  productName             String?
+  model                   String?
+  notes                   String?
+  historical              Boolean                 @default(false)
+  originalDate            DateTime?               @db.Date
+  recordSource            String                  @default("MANUAL")
+  tickets                 ServiceTicket[]
+  amcOpportunities        AmcOpportunity[]
+  consumableOpportunities ConsumableOpportunity[]
+  id                      String                  @id @default(cuid())
+  serialNumber            String                  @unique
+  orderId                 String?
+  order                   PurchaseOrder?          @relation(fields: [orderId], references: [id])
+  orderItemId             String?
+  orderItem               PurchaseOrderItem?      @relation(fields: [orderItemId], references: [id])
+  deliveryId              String?
+  delivery                Delivery?               @relation(fields: [deliveryId], references: [id])
+  customerId              String
+  customer                Customer                @relation(fields: [customerId], references: [id])
+  installation            Installation?
+  warranties              Warranty[]
+  amcs                    AmcEquipment[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
   @@index([orderItemId])
 }
 
 model Installation {
+  historical        Boolean            @default(false)
+  originalDate      DateTime?          @db.Date
+  recordSource      String             @default("MANUAL")
   id                String             @id @default(cuid())
   equipmentId       String             @unique
   equipment         Equipment          @relation(fields: [equipmentId], references: [id])
@@ -426,6 +456,10 @@ model Installation {
 }
 
 model Warranty {
+  type           String            @default("STANDARD")
+  historical     Boolean           @default(false)
+  originalDate   DateTime?         @db.Date
+  recordSource   String            @default("MANUAL")
   id             String            @id @default(cuid())
   equipmentId    String
   equipment      Equipment         @relation(fields: [equipmentId], references: [id])
@@ -454,24 +488,26 @@ model WarrantyHistory {
 }
 
 model AmcContract {
-  id                     String         @id @default(cuid())
-  number                 String         @unique
+  slaRules               SlaRule[]
+  opportunities          AmcOpportunity[]
+  id                     String           @id @default(cuid())
+  number                 String           @unique
   customerId             String
-  customer               Customer       @relation(fields: [customerId], references: [id])
-  startDate              DateTime       @db.Date
-  endDate                DateTime       @db.Date
-  amount                 Decimal        @db.Decimal(18, 2)
+  customer               Customer         @relation(fields: [customerId], references: [id])
+  startDate              DateTime         @db.Date
+  endDate                DateTime         @db.Date
+  amount                 Decimal          @db.Decimal(18, 2)
   serviceFrequencyMonths Int
-  nextServiceDate        DateTime?      @db.Date
+  nextServiceDate        DateTime?        @db.Date
   responsibleName        String?
-  status                 String         @default("ACTIVE")
+  status                 String           @default("ACTIVE")
   notes                  String?
   renewedFromId          String?
   equipment              AmcEquipment[]
   visits                 ServiceVisit[]
   files                  StoredFile[]
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   @@index([endDate, nextServiceDate])
 }
@@ -591,6 +627,10 @@ model AuditLog {
 }
 
 model StoredFile {
+  ticketId          String?
+  ticket            ServiceTicket?     @relation(fields: [ticketId], references: [id])
+  ticketVisitId     String?
+  ticketVisit       TicketVisit?       @relation(fields: [ticketVisitId], references: [id])
   securityId        String?
   security          Security?          @relation(fields: [securityId], references: [id])
   id                String             @id @default(cuid())
@@ -982,4 +1022,207 @@ model MailLog {
   updatedAt     DateTime  @updatedAt
 
   @@index([relatedModule, recordId])
+}
+
+model ServiceTicket {
+  id              String                 @id @default(cuid())
+  number          String                 @unique
+  customerId      String
+  customer        Customer               @relation(fields: [customerId], references: [id])
+  equipmentId     String?
+  equipment       Equipment?             @relation(fields: [equipmentId], references: [id])
+  manufacturerId  String?
+  manufacturer    Manufacturer?          @relation(fields: [manufacturerId], references: [id])
+  serialNumber    String?
+  productName     String
+  model           String?
+  department      String?
+  issue           String
+  priority        String                 @default("NORMAL")
+  reportedAt      DateTime
+  contactName     String?
+  contactPhone    String?
+  assignedToId    String?
+  assignedAt      DateTime?
+  firstVisitAt    DateTime?
+  scheduledVisit  DateTime?
+  resolution      String?
+  resolvedAt      DateTime?
+  status          String                 @default("OPEN")
+  slaRuleId       String?
+  slaRule         SlaRule?               @relation(fields: [slaRuleId], references: [id])
+  assignmentDueAt DateTime?
+  firstVisitDueAt DateTime?
+  resolutionDueAt DateTime?
+  notes           String?
+  historical      Boolean                @default(false)
+  originalDate    DateTime?              @db.Date
+  recordSource    String                 @default("MANUAL")
+  visits          TicketVisit[]
+  inventory       InventoryTransaction[]
+  files           StoredFile[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([customerId, equipmentId])
+  @@index([assignedToId, status, scheduledVisit])
+  @@index([priority, status, resolutionDueAt])
+}
+
+model TicketVisit {
+  id              String        @id @default(cuid())
+  ticketId        String
+  ticket          ServiceTicket @relation(fields: [ticketId], references: [id])
+  engineerId      String
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  completedAt     DateTime?
+  status          String        @default("SCHEDULED")
+  workDone        String?
+  representative  String?
+  acknowledgement String?
+  nextVisit       DateTime?
+  notes           String?
+  files           StoredFile[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([engineerId, status, scheduledAt])
+}
+
+model SlaRule {
+  id              String          @id @default(cuid())
+  name            String
+  customerId      String?
+  customer        Customer?       @relation(fields: [customerId], references: [id])
+  manufacturerId  String?
+  manufacturer    Manufacturer?   @relation(fields: [manufacturerId], references: [id])
+  amcId           String?
+  amc             AmcContract?    @relation(fields: [amcId], references: [id])
+  warrantyType    String?
+  assignmentHours Int
+  firstVisitHours Int
+  resolutionHours Int
+  active          Boolean         @default(true)
+  notes           String?
+  tickets         ServiceTicket[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([customerId, manufacturerId, active])
+}
+
+model AmcOpportunity {
+  id             String       @id @default(cuid())
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  equipmentId    String
+  equipment      Equipment    @relation(fields: [equipmentId], references: [id])
+  amcId          String?
+  amc            AmcContract? @relation(fields: [amcId], references: [id])
+  reason         String
+  triggerDate    DateTime?    @db.Date
+  status         String       @default("NEW")
+  assignedToId   String?
+  followUpDate   DateTime?
+  estimatedValue Decimal?     @db.Decimal(18, 2)
+  notes          String?
+  generated      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([equipmentId, reason])
+  @@index([status, followUpDate])
+}
+
+model Consumable {
+  id             String                    @id @default(cuid())
+  sku            String                    @unique
+  name           String
+  manufacturerId String?
+  manufacturer   Manufacturer?             @relation(fields: [manufacturerId], references: [id])
+  active         Boolean                   @default(true)
+  notes          String?
+  compatibility  ConsumableCompatibility[]
+  opportunities  ConsumableOpportunity[]
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+}
+
+model ConsumableCompatibility {
+  id           String     @id @default(cuid())
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+  consumableId String
+  consumable   Consumable @relation(fields: [consumableId], references: [id])
+  active       Boolean    @default(true)
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([productId, consumableId])
+}
+
+model ConsumableOpportunity {
+  id           String     @id @default(cuid())
+  customerId   String
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  equipmentId  String?
+  equipment    Equipment? @relation(fields: [equipmentId], references: [id])
+  consumableId String
+  consumable   Consumable @relation(fields: [consumableId], references: [id])
+  lastSale     DateTime?  @db.Date
+  lastQuantity Int?
+  nextFollowUp DateTime?
+  assignedToId String?
+  status       String     @default("NEW")
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([customerId, equipmentId, status])
+  @@index([nextFollowUp])
+}
+
+model SparePart {
+  id               String                 @id @default(cuid())
+  sku              String                 @unique
+  name             String
+  manufacturerId   String?
+  manufacturer     Manufacturer?          @relation(fields: [manufacturerId], references: [id])
+  compatibleModels String?
+  onHand           Int                    @default(0)
+  reserved         Int                    @default(0)
+  reorderLevel     Int                    @default(0)
+  unitCost         Decimal?               @db.Decimal(18, 2)
+  location         String?
+  supplier         String?
+  active           Boolean                @default(true)
+  notes            String?
+  transactions     InventoryTransaction[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+}
+
+model InventoryTransaction {
+  fromReserved    Boolean        @default(false)
+  id              String         @id @default(cuid())
+  partId          String
+  part            SparePart      @relation(fields: [partId], references: [id])
+  type            String
+  quantity        Int
+  ticketId        String?
+  ticket          ServiceTicket? @relation(fields: [ticketId], references: [id])
+  engineerId      String?
+  transactionDate DateTime
+  actorId         String
+  onHandAfter     Int
+  reservedAfter   Int
+  notes           String?
+  requestId       String         @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([partId, transactionDate])
+  @@index([ticketId])
 }

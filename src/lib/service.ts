@@ -1,3 +1,5 @@
+import { prepareService } from "./service-operations-service";
+import { serviceResources } from "./service-operations";
 import { prepareControls } from "./controls-service";
 import { controlResources } from "./controls";
 import { prepareCommercial } from "./commercial-service";
@@ -69,6 +71,8 @@ export async function save(
         await prepareCommercial(tx, name, data, user, old, id);
       if (Object.hasOwn(controlResources, name))
         await prepareControls(tx, name, data, user, old);
+      if (Object.hasOwn(serviceResources, name))
+        await prepareService(tx, name, data, user, old, id);
       if (name === "tasks") {
         if (!id) data.createdById = user.id;
         if (
@@ -411,33 +415,103 @@ export async function save(
           data.items = { ...(id ? { deleteMany: {} } : {}), create: items };
       }
       if (name === "equipment") {
-        const delivery = await tx.delivery.findUnique({
-          where: { id: String(data.deliveryId) },
-          include: { items: true, order: true },
-        });
-        const item = delivery?.items.find(
-          (i) => i.orderItemId === data.orderItemId,
-        );
-        if (
-          !delivery ||
-          !delivery.confirmed ||
-          !item ||
-          delivery.orderId !== data.orderId ||
-          delivery.order.customerId !== data.customerId
-        )
-          throw new AppError(
-            400,
-            "Equipment must match a confirmed delivery, order item and customer",
+        if (data.historical) {
+          if (data.orderId) {
+            const o = await tx.purchaseOrder.findUnique({
+              where: { id: String(data.orderId) },
+            });
+            if (o?.customerId !== data.customerId)
+              throw new AppError(
+                400,
+                "Historical order must match equipment customer",
+              );
+          }
+          if (data.deliveryId) {
+            const d = await tx.delivery.findUnique({
+              where: { id: String(data.deliveryId) },
+              include: { order: true },
+            });
+            if (
+              !d ||
+              d.order.customerId !== data.customerId ||
+              (data.orderId && d.orderId !== data.orderId)
+            )
+              throw new AppError(
+                400,
+                "Historical delivery must match equipment customer/order",
+              );
+            data.orderId ||= d.orderId;
+          }
+          if (data.orderItemId) {
+            const i = await tx.purchaseOrderItem.findUnique({
+              where: { id: String(data.orderItemId) },
+              include: { order: true },
+            });
+            if (
+              !i ||
+              i.order.customerId !== data.customerId ||
+              (data.orderId && i.orderId !== data.orderId)
+            )
+              throw new AppError(
+                400,
+                "Historical item must match equipment customer/order",
+              );
+            data.orderId ||= i.orderId;
+            data.productName ||= i.equipment;
+            data.manufacturerId ||= i.manufacturerId;
+            data.model ||= i.model;
+          }
+          if (!data.productName)
+            throw new AppError(
+              400,
+              "Enter the actual equipment name for historical registration",
+            );
+          if (data.productId) {
+            const p = await tx.product.findUnique({
+              where: { id: String(data.productId) },
+            });
+            if (
+              !p ||
+              (data.manufacturerId && p.manufacturerId !== data.manufacturerId)
+            )
+              throw new AppError(400, "Product and manufacturer do not match");
+            data.manufacturerId ||= p.manufacturerId;
+          }
+        } else {
+          const delivery = await tx.delivery.findUnique({
+            where: { id: String(data.deliveryId) },
+            include: { items: true, order: true },
+          });
+          const item = delivery?.items.find(
+            (i) => i.orderItemId === data.orderItemId,
           );
-        if (
-          (await tx.equipment.count({
-            where: { deliveryId: delivery.id, orderItemId: item.orderItemId },
-          })) >= item.quantity
-        )
-          throw new AppError(
-            400,
-            "All delivered units already have serial numbers",
-          );
+          if (
+            !delivery ||
+            !delivery.confirmed ||
+            !item ||
+            delivery.orderId !== data.orderId ||
+            delivery.order.customerId !== data.customerId
+          )
+            throw new AppError(
+              400,
+              "Equipment must match a confirmed delivery, order item and customer",
+            );
+          if (
+            (await tx.equipment.count({
+              where: { deliveryId: delivery.id, orderItemId: item.orderItemId },
+            })) >= item.quantity
+          )
+            throw new AppError(
+              400,
+              "All delivered units already have serial numbers",
+            );
+          const orderItem = await tx.purchaseOrderItem.findUniqueOrThrow({
+            where: { id: String(data.orderItemId) },
+          });
+          data.manufacturerId ||= orderItem.manufacturerId;
+          data.productName ||= orderItem.equipment;
+          data.model ||= orderItem.model;
+        }
       }
       if (name === "installations") {
         const equipment = await tx.equipment.findUnique({
@@ -457,7 +531,7 @@ export async function save(
             "Contract dates are locked after warranty registration",
           );
         const dates = [
-          equipment.delivery.actualDate,
+          equipment.delivery?.actualDate,
           data.installationDate,
           data.commissioningDate,
           data.acceptanceDate,
@@ -490,23 +564,34 @@ export async function save(
         if (!equipment) throw new AppError(400, "Equipment not found");
         const basis = String(data.commencement);
         const start =
-          basis === "DELIVERY"
-            ? equipment.delivery.actualDate
-            : basis === "INSTALLATION"
-              ? equipment.installation?.installationDate
-              : basis === "COMMISSIONING"
-                ? equipment.installation?.commissioningDate
-                : equipment.installation?.acceptanceDate;
+          (basis === "CONTRACT" || data.historical) && data.startDate
+            ? (data.startDate as Date)
+            : basis === "DELIVERY"
+              ? equipment.delivery?.actualDate
+              : basis === "INSTALLATION"
+                ? equipment.installation?.installationDate
+                : basis === "COMMISSIONING"
+                  ? equipment.installation?.commissioningDate
+                  : equipment.installation?.acceptanceDate;
         if (!start)
           throw new AppError(
             400,
             "Confirm the contractual commencement event first",
           );
         data.startDate = start;
-        data.endDate = addMonths(start, Number(data.durationMonths));
+        data.endDate =
+          data.historical && data.endDate
+            ? data.endDate
+            : addMonths(start, Number(data.durationMonths));
+        if ((data.endDate as Date) <= start)
+          throw new AppError(400, "Warranty end must follow start");
         if (
           await tx.warranty.count({
-            where: { equipmentId: equipment.id, endDate: { gte: start } },
+            where: {
+              equipmentId: equipment.id,
+              endDate: { gte: start },
+              startDate: { lte: data.endDate as Date },
+            },
           })
         )
           throw new AppError(

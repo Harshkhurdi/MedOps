@@ -38,7 +38,7 @@ export async function GET(
       );
     const columns = configs[name].columns;
     const rows = records.map((row) => {
-      const safe = safeRecord(name, row);
+      const safe = safeRecord(name, row, user);
       return columns.map((key) =>
         safe[key] == null
           ? ""

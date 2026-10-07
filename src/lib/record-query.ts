@@ -25,7 +25,7 @@ export async function recordWhere(
     where.dismissedAt = null;
     if (user.role !== "ADMIN") {
       const allowed = user.permissions
-        .filter((p) => p.read)
+        .filter((p) => p.read && canResource(user, p.module))
         .map((p) => p.module);
       where.module = { in: allowed };
       const tasks = allowed.includes("tasks")
@@ -48,7 +48,9 @@ export async function recordWhere(
   }
   if (name === "generated" && user.role !== "ADMIN")
     where.sourceModule = {
-      in: user.permissions.filter((p) => p.read).map((p) => p.module),
+      in: user.permissions
+        .filter((p) => p.read && canResource(user, p.module))
+        .map((p) => p.module),
     };
   if (name === "tasks" && user.role !== "ADMIN")
     where.AND = [{ OR: [{ createdById: user.id }, { assignedToId: user.id }] }];
@@ -78,7 +80,19 @@ export async function recordWhere(
   if (parent && parentFields[name]) where[parentFields[name]] = parent;
   return where;
 }
-export function safeRecord(name: Collection, row: Record<string, unknown>) {
+export function safeRecord(
+  name: Collection,
+  row: Record<string, unknown>,
+  user?: Actor,
+) {
+  if (name === "parts") {
+    const safe: Record<string, unknown> = {
+      ...row,
+      availableQuantity: Number(row.onHand) - Number(row.reserved),
+    };
+    if (user && !can(user, "pricing")) delete safe.unitCost;
+    return safe;
+  }
   if (name === "quotes") {
     const series = row.series as Record<string, unknown>;
     return {
@@ -111,7 +125,7 @@ export async function assertNotificationScope(
   user: Actor,
   row: Record<string, unknown>,
 ) {
-  if (row.userId !== user.id || !can(user, String(row.module)))
+  if (row.userId !== user.id || !canResource(user, String(row.module)))
     throw new AppError(404, "Notification not found");
   if (
     user.role !== "ADMIN" &&

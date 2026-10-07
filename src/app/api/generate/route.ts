@@ -10,6 +10,7 @@ const input = z
     templateId: z.string(),
     sourceModule: z.enum([
       "rfqs",
+      "ticket-visits",
       "tenders",
       "deliveries",
       "installations",
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
         "CUSTOM",
       ],
       invoices: ["PAYMENT_REMINDER", "CUSTOM"],
+      "ticket-visits": ["SERVICE_REPORT", "CUSTOM"],
     };
     if (!allowed[data.sourceModule].includes(template.kind))
       throw new AppError(400, "Template does not match the source module");
@@ -152,7 +154,8 @@ export async function POST(req: Request) {
       defaults = {
         ...defaults,
         hospital_name: i.equipment.customer.name,
-        equipment_name: i.equipment.orderItem.equipment,
+        equipment_name:
+          i.equipment.orderItem?.equipment ?? i.equipment.productName ?? "",
         serial_numbers: i.equipment.serialNumber,
         installation_date: i.installationDate?.toISOString().slice(0, 10) ?? "",
         commissioning_date:
@@ -177,6 +180,26 @@ export async function POST(req: Request) {
           i.payments.map((p) => ({ amount: String(p.amount) })),
         ),
         due_date: i.dueDate.toISOString().slice(0, 10),
+      };
+    }
+    if (data.sourceModule === "ticket-visits") {
+      const v = await db.ticketVisit.findUnique({
+        where: { id: data.sourceId },
+        include: { ticket: { include: { customer: true } } },
+      });
+      if (!v) throw new AppError(404, "Service visit not found");
+      defaults = {
+        ...defaults,
+        hospital_name: v.ticket.customer.name,
+        ticket_number: v.ticket.number,
+        equipment_name: v.ticket.productName,
+        serial_number: v.ticket.serialNumber ?? "",
+        reported_issue: v.ticket.issue,
+        work_done: v.workDone ?? "",
+        visit_date: (v.startedAt ?? v.scheduledAt).toISOString(),
+        representative: v.representative ?? "",
+        acknowledgement: v.acknowledgement ?? "",
+        report_notes: v.notes ?? "",
       };
     }
     const values = { ...defaults, ...data.values };
