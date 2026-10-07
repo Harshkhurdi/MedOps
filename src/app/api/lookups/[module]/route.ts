@@ -1,7 +1,30 @@
+import { canResource } from "@/lib/record-access";
 import { api, AppError } from "@/lib/errors";
-import { currentUser, can } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 import { collection, delegate } from "@/lib/resources";
 const selections: Record<string, object> = {
+  rfqs: {
+    id: true,
+    number: true,
+    manufacturerId: true,
+    customerId: true,
+    tenderId: true,
+    productId: true,
+    productName: true,
+    model: true,
+    quantity: true,
+    warrantyRequirement: true,
+    deliveryLocation: true,
+    quoteRequiredBy: true,
+  },
+  quotes: { id: true, number: true, seriesId: true, revision: true },
+  products: { id: true, name: true, model: true, manufacturerId: true },
+  "manufacturer-contacts": {
+    id: true,
+    name: true,
+    manufacturerId: true,
+    active: true,
+  },
   customers: { id: true, name: true, address: true },
   manufacturers: { id: true, name: true },
   tenders: {
@@ -9,6 +32,9 @@ const selections: Record<string, object> = {
     number: true,
     customerId: true,
     status: true,
+    title: true,
+    warrantyTerms: true,
+    deadline: true,
     deliveryTerms: true,
     items: {
       select: {
@@ -61,6 +87,19 @@ const selections: Record<string, object> = {
   },
 };
 const dependencies: Record<string, string[]> = {
+  decisions: ["tenders"],
+  results: ["tenders"],
+  "manufacturer-contacts": ["manufacturers"],
+  rfqs: [
+    "manufacturers",
+    "manufacturer-contacts",
+    "products",
+    "tenders",
+    "customers",
+  ],
+  "rfq-followups": ["rfqs"],
+  quotes: ["manufacturers", "products", "tenders", "rfqs", "quotes"],
+  comparisons: ["tenders", "rfqs", "quotes"],
   products: ["manufacturers"],
   documents: ["manufacturers"],
   company: ["documents"],
@@ -78,6 +117,10 @@ const dependencies: Record<string, string[]> = {
   followups: ["invoices"],
 };
 const searchFields: Record<string, string> = {
+  rfqs: "number",
+  quotes: "number",
+  products: "name",
+  "manufacturer-contacts": "name",
   customers: "name",
   manufacturers: "name",
   tenders: "number",
@@ -102,8 +145,9 @@ export async function GET(
     if (
       !selections[name] ||
       !(
-        can(user, name) ||
-        (dependencies[workflow]?.includes(name) && can(user, workflow, true))
+        canResource(user, name) ||
+        (dependencies[workflow]?.includes(name) &&
+          canResource(user, workflow, true))
       )
     )
       throw new AppError(403, "Record selection permission is required");
@@ -118,6 +162,13 @@ export async function GET(
     else if (ids.length) where.id = { in: ids };
     else if (q && searchFields[name])
       where[searchFields[name]] = { contains: q, mode: "insensitive" };
+    if (name === "manufacturer-contacts") {
+      where.active = true;
+      if (params.get("manufacturerId"))
+        where.manufacturerId = params.get("manufacturerId");
+    }
+    if (name === "products" && params.get("manufacturerId"))
+      where.manufacturerId = params.get("manufacturerId");
     if (name === "tenders" && workflow === "orders") where.status = "WON";
     if (name === "deliveries" && workflow === "equipment")
       where.confirmed = true;

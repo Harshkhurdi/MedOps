@@ -1,5 +1,6 @@
+import { authorizeResource } from "@/lib/record-access";
 import { api, json } from "@/lib/errors";
-import { authorize, csrf } from "@/lib/auth";
+import { csrf } from "@/lib/auth";
 import { collection, delegate, resources } from "@/lib/resources";
 import { recordWhere, safeRecord } from "@/lib/record-query";
 import { save } from "@/lib/service";
@@ -10,7 +11,7 @@ export async function GET(
 ) {
   return api(async () => {
     const name = collection((await ctx.params).module),
-      user = await authorize(name);
+      user = await authorizeResource(name);
     const params = new URL(req.url).searchParams;
     const page = Math.max(
         1,
@@ -49,7 +50,7 @@ export async function POST(
   return api(async () => {
     csrf(req);
     const name = collection((await ctx.params).module);
-    const user = await authorize(name, true);
+    const user = await authorizeResource(name, true);
     return Response.json(await save(name, await json(req), user), {
       status: 201,
     });

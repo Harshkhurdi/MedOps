@@ -71,6 +71,17 @@ export async function recordWhere(
   return where;
 }
 export function safeRecord(name: Collection, row: Record<string, unknown>) {
+  if (name === "quotes") {
+    const series = row.series as Record<string, unknown>;
+    return {
+      ...row,
+      manufacturerId: series.manufacturerId,
+      rfqId: series.rfqId,
+      tenderId: series.tenderId,
+      productId: series.productId,
+      manufacturer: series.manufacturer,
+    };
+  }
   if (name === "users") {
     const { passwordHash: _, ...safe } = row;
     void _;

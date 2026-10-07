@@ -14,6 +14,10 @@ import { renderTemplate } from "./business";
 import { AppError } from "./errors";
 export const standardTemplates: Record<string, { name: string; body: string }> =
   {
+    RFQ_LETTER: {
+      name: "Request for quotation",
+      body: "To: {{manufacturer_name}}\nSubject: RFQ {{rfq_number}}\n\nPlease provide your quotation for {{equipment_name}}, model {{model_number}}, quantity {{quantity}}.\nWarranty requirement: {{warranty_period}}\nDelivery location: {{delivery_location}}\nQuote required by: {{quote_required_by}}\n\n{{company_name}}\n{{authorized_signatory}}",
+    },
     COVERING_LETTER: {
       name: "Tender covering letter",
       body: "To: {{hospital_name}}\nSubject: Tender {{tender_number}}\n\nWe, {{company_name}}, submit our reviewed bid for {{equipment_name}}, model {{model_number}}, quantity {{quantity}}.\nPlease refer to the enclosed approved supporting documents.\n\n{{authorized_signatory}}\n{{company_address}}",

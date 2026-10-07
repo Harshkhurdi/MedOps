@@ -1,3 +1,4 @@
+import { commercialSchemas } from "./commercial";
 import { z } from "zod";
 const text = z.string().trim().min(1).max(500);
 const notes = z.string().max(10000).optional().nullable();
@@ -54,6 +55,7 @@ const orderItem = z
   })
   .strict();
 export const schemas = {
+  ...commercialSchemas,
   company: z
     .object({
       legalName: text,
@@ -134,7 +136,24 @@ export const schemas = {
         }, "Use an HTTPS GeM URL")
         .optional()
         .nullable(),
-      customerId: id,
+      customerId: optionalId,
+      bidNumber: notes,
+      title: notes,
+      state: notes,
+      source: notes,
+      sourceUrl: z.url().nullable().optional(),
+      publicationDate: optionalDate,
+      historical: z.boolean().default(false),
+      originalDate: optionalDate,
+      recordSource: z
+        .enum([
+          "MANUAL",
+          "PDF_ASSISTED",
+          "SYSTEM_GENERATED",
+          "FUTURE_IMPORT",
+          "FUTURE_ACCOUNTING_SYNC",
+        ])
+        .default("MANUAL"),
       category: notes,
       deadline: optionalDate,
       emd: cash.optional().nullable(),
@@ -143,7 +162,7 @@ export const schemas = {
       deliveryTerms: notes,
       notes,
       status: z.enum(tenderStatuses).default("DRAFT"),
-      items: z.array(tenderItem).min(1).max(100),
+      items: z.array(tenderItem).max(100).default([]),
     })
     .strict(),
   requirements: z
@@ -161,6 +180,7 @@ export const schemas = {
     .object({
       name: text,
       kind: z.enum([
+        "RFQ_LETTER",
         "COVERING_LETTER",
         "NON_BLACKLISTING",
         "WARRANTY_UNDERTAKING",
@@ -322,7 +342,7 @@ export const schemas = {
             .object({ module: text, read: z.boolean(), write: z.boolean() })
             .strict(),
         )
-        .max(30)
+        .max(100)
         .default([]),
     })
     .strict(),

@@ -1,4 +1,5 @@
 import { schemas, type Resource } from "./schemas";
+import { commercialResources } from "./commercial";
 import { db } from "./db";
 import { AppError } from "./errors";
 // Linked records expose only the identification and operational fields needed
@@ -64,6 +65,7 @@ const invoiceSummary = {
   },
 } as const;
 export const resources = {
+  ...commercialResources,
   tasks: {
     model: "task",
     search: ["title", "notes"],

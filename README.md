@@ -144,3 +144,7 @@ See [security](docs/SECURITY.md) and [backup/recovery](docs/BACKUP.md).
 - Email/WhatsApp alerts, external accounting integration, financial adjustments and automatic OCR are intentionally outside Version 1. OpenRouter credentials are server-only environment secrets; the database stores only request metadata, never prompt or response text.
 - Dependency audit may report an upstream development-only `braces`/lint-tool advisory without an available patched release. Production request processing does not run glob expansion from user input. Patched overrides are applied to the available transitive fixes; do not use `npm audit fix --force` to downgrade core frameworks.
 - Backup retention/off-site copies and real-document production acceptance require the company's operator. A deployment alone does not prove backups or business-specific template compliance.
+
+### Commercial expansion (Phase A)
+
+Manual incomplete tenders, confirmed Go/No-Go decisions with history, multiple manufacturer contacts, standalone or tender/customer RFQs, manual sending and follow-ups, private source quotation uploads, immutable quotation revisions, exact commercial assumptions and neutral comparisons, and actual win/loss results are available. RFQ letters use approved templates for real DOCX/PDF generation. Quote, comparison and result access additionally requires the Pricing permission. Historical RFQ/quote/result entry requires an administrator. No external AI processing or automatic messages are added. See `docs/expansion/PROGRESS.md` for verification and rollout status.

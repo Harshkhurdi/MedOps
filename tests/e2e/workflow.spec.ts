@@ -39,7 +39,7 @@ test("employee screens, tender-to-payment API workflow, review and private files
     address: "Synthetic local-only test",
   });
   await page.goto("/tenders");
-  await page.getByRole("button", { name: "Add record", exact: true }).click();
+  await page.getByRole("button", { name: "New Tender", exact: true }).click();
   await page.getByLabel(/Tender\ number/).fill(`E2E-TENDER-${suffix}`);
   await page
     .getByLabel(/Procuring\ institution/)

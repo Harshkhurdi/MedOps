@@ -1,3 +1,4 @@
+import { commercialConfigs, historicalFields } from "./commercial-config";
 export type Field = {
   key: string;
   label: string;
@@ -27,6 +28,8 @@ export type ModuleConfig = {
   fields: Field[];
   columns: string[];
   readOnly?: boolean;
+  immutable?: boolean;
+  createLabel?: string;
   files?: boolean;
 };
 const f = (
@@ -52,6 +55,7 @@ const orderItems: Field[] = [
   { ...f("taxRate", "Tax %", "number", true), default: "0" },
 ];
 export const configs: Record<string, ModuleConfig> = {
+  ...commercialConfigs,
   company: {
     title: "Company profile",
     description:
@@ -150,14 +154,22 @@ export const configs: Record<string, ModuleConfig> = {
   },
   tenders: {
     title: "Tenders",
+    createLabel: "New Tender",
     description:
       "Manage each opportunity from initial review to a submitted, reviewed bid.",
     columns: ["number", "customer", "status", "deadline"],
     files: true,
     fields: [
+      f("bidNumber", "Bid number"),
+      f("title", "Tender title"),
+      f("state", "State"),
+      f("source", "Tender source"),
+      f("sourceUrl", "Source URL"),
+      f("publicationDate", "Publication date", "date"),
+      ...historicalFields,
       f("number", "Tender number", "text", true),
       f("gemUrl", "GeM tender URL"),
-      rel("customerId", "Procuring institution", "customers"),
+      rel("customerId", "Procuring institution", "customers", false),
       f("category", "Equipment category"),
       f("deadline", "Submission deadline", "datetime-local"),
       f("emd", "EMD (INR)", "number"),
@@ -216,6 +228,7 @@ export const configs: Record<string, ModuleConfig> = {
     fields: [
       f("name", "Template name", "text", true),
       f("kind", "Document type", "select", true, [
+        "RFQ_LETTER",
         "COVERING_LETTER",
         "NON_BLACKLISTING",
         "WARRANTY_UNDERTAKING",

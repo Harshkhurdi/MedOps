@@ -16,6 +16,17 @@ import {
 import { type Field, type ModuleConfig, label } from "@/lib/ui-config";
 type Row = Record<string, unknown>;
 const permissionModules = [
+  "pricing",
+  "decisions",
+  "manufacturer-contacts",
+  "rfqs",
+  "rfq-followups",
+  "quotes",
+  "comparisons",
+  "results",
+  "settings",
+  "users",
+  "audit",
   "dashboard",
   "tasks",
   "reports",
@@ -94,7 +105,7 @@ export function Relation({
         const response = await fetch(
           field.source === "employees"
             ? "/api/employees"
-            : `/api/lookups/${field.source}?for=${root.__module ?? ""}&q=${encodeURIComponent(search)}&ids=${encodeURIComponent((multiple ? ((value as string[]) ?? []) : value ? [String(value)] : []).join(","))}&customerId=${encodeURIComponent(String(root.customerId ?? ""))}`,
+            : `/api/lookups/${field.source}?for=${root.__module ?? ""}&q=${encodeURIComponent(search)}&ids=${encodeURIComponent((multiple ? ((value as string[]) ?? []) : value ? [String(value)] : []).join(","))}&manufacturerId=${encodeURIComponent(String(root.manufacturerId ?? ""))}&customerId=${encodeURIComponent(String(root.customerId ?? ""))}`,
           { signal: control.signal },
         );
         if (!response.ok) {
@@ -119,6 +130,7 @@ export function Relation({
     field.key,
     root.orderId,
     root.customerId,
+    root.manufacturerId,
     root.items,
     root.__module,
     multiple,
@@ -208,6 +220,60 @@ export function RecordForm({
     [busy, setBusy] = useState(false);
   async function setField(key: string, value: unknown) {
     setValues((v) => ({ ...v, [key]: value }));
+    if (module === "rfqs" && key === "tenderId" && value) {
+      const r = await fetch(
+        `/api/lookups/tenders?for=rfqs&ids=${encodeURIComponent(String(value))}`,
+      );
+      if (r.ok) {
+        const t = (await r.json()).rows[0];
+        if (t)
+          setValues((v) => ({
+            ...v,
+            customerId: t.customerId ?? "",
+            productName: t.items[0]?.equipment ?? "",
+            model: t.items[0]?.model ?? "",
+            quantity: t.items[0]?.quantity ?? 1,
+            manufacturerId: t.items[0]?.manufacturerId ?? "",
+            warrantyRequirement: t.warrantyTerms ?? "",
+            tenderDeadline: t.deadline
+              ? new Date(t.deadline).toISOString().slice(0, 16)
+              : "",
+          }));
+      }
+    }
+    if (["rfqs", "quotes"].includes(module) && key === "productId" && value) {
+      const r = await fetch(
+        `/api/lookups/products?for=${module}&ids=${encodeURIComponent(String(value))}`,
+      );
+      if (r.ok) {
+        const p = (await r.json()).rows[0];
+        if (p)
+          setValues((v) => ({
+            ...v,
+            productName: p.name,
+            model: p.model,
+            manufacturerId: p.manufacturerId,
+          }));
+      }
+    }
+    if (module === "quotes" && key === "rfqId" && value) {
+      const r = await fetch(
+        `/api/lookups/rfqs?for=quotes&ids=${encodeURIComponent(String(value))}`,
+      );
+      if (r.ok) {
+        const q = (await r.json()).rows[0];
+        if (q)
+          setValues((v) => ({
+            ...v,
+            manufacturerId: q.manufacturerId,
+            tenderId: q.tenderId ?? "",
+            productId: q.productId ?? "",
+            productName: q.productName,
+            model: q.model ?? "",
+            quantity: q.quantity,
+          }));
+      }
+    }
     if (module === "orders" && key === "tenderId" && value) {
       const r = await fetch(`/api/lookups/tenders?for=orders&ids=${value}`);
       if (r.ok) {
@@ -303,13 +369,14 @@ export function RecordForm({
         config.fields.map((f) => [f.key, normalize(f, values[f.key])]),
       );
       if (module === "users" && !data.password) delete data.password;
+      const editing = row && !row.__new;
       const response = await fetch(
-        `/api/records/${module}${row ? "/" + row.id : ""}`,
+        `/api/records/${module}${editing ? "/" + row.id : ""}`,
         {
-          method: row ? "PATCH" : "POST",
+          method: editing ? "PATCH" : "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(row ? { "If-Match": JSON.stringify(row.updatedAt) } : {}),
+            ...(editing ? { "If-Match": JSON.stringify(row.updatedAt) } : {}),
           },
           body: JSON.stringify(data),
         },

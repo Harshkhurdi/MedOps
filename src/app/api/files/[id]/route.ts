@@ -1,5 +1,6 @@
+import { authorizeResource } from "@/lib/record-access";
 import { api, AppError } from "@/lib/errors";
-import { authorize, audit, currentUser } from "@/lib/auth";
+import { audit, currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { retrieve } from "@/lib/storage";
 export async function GET(
@@ -12,7 +13,7 @@ export async function GET(
       where: { id: (await ctx.params).id },
     });
     if (!file) throw new AppError(404, "File not found");
-    const user = await authorize(file.module);
+    const user = await authorizeResource(file.module);
     const bytes = await retrieve(file.key);
     await audit(user.id, "DOWNLOAD_FILE", file.module, file.recordId, {
       fileId: file.id,

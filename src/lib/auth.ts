@@ -12,6 +12,14 @@ export const COOKIE =
     ? "__Host-medops-session"
     : "medops-session";
 export const MODULES = [
+  "pricing",
+  "decisions",
+  "manufacturer-contacts",
+  "rfqs",
+  "rfq-followups",
+  "quotes",
+  "comparisons",
+  "results",
   "dashboard",
   "tasks",
   "reports",

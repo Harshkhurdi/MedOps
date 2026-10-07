@@ -29,6 +29,8 @@ const navigation = [
   ["reports", "Reports"],
   ["ai", "AI writing assistant"],
   ["tenders", "Tenders"],
+  ["rfqs", "RFQs & quotations"],
+  ["comparison", "Commercial comparison"],
   ["generator", "Document generator"],
   ["orders", "Purchase orders"],
   ["deliveries", "Deliveries & installations"],
@@ -53,7 +55,13 @@ export default function Shell({
   const allowed = (m: string) =>
     user.role === "ADMIN" ||
     user.permissions.some(
-      (p) => p.module === (m === "generator" ? "generated" : m) && p.read,
+      (p) =>
+        p.module ===
+          (m === "generator"
+            ? "generated"
+            : m === "comparison"
+              ? "comparisons"
+              : m) && p.read,
     );
   const drawer = (
     <Box sx={{ height: "100%", bgcolor: "#142d39", color: "#dbe7ea" }}>

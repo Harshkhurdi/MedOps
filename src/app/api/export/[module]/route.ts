@@ -1,6 +1,7 @@
+import { authorizeResource } from "@/lib/record-access";
 import ExcelJS from "exceljs";
 import { api, AppError } from "@/lib/errors";
-import { authorize, audit } from "@/lib/auth";
+import { audit } from "@/lib/auth";
 import { collection, delegate, resources } from "@/lib/resources";
 import { recordWhere, safeRecord } from "@/lib/record-query";
 import { configs, label } from "@/lib/ui-config";
@@ -12,7 +13,7 @@ export async function GET(
 ) {
   return api(async () => {
     const name = collection((await ctx.params).module),
-      user = await authorize(name),
+      user = await authorizeResource(name),
       params = new URL(req.url).searchParams;
     const format = params.get("format") ?? "xlsx";
     if (!["xlsx", "csv"].includes(format))

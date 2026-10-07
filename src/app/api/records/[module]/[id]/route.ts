@@ -1,5 +1,6 @@
+import { authorizeResource } from "@/lib/record-access";
 import { api, AppError, json } from "@/lib/errors";
-import { authorize, csrf, audit, can } from "@/lib/auth";
+import { csrf, audit, can } from "@/lib/auth";
 import { collection, delegate, resources } from "@/lib/resources";
 import { safeRecord, assertNotificationScope } from "@/lib/record-query";
 import { save } from "@/lib/service";
@@ -12,7 +13,7 @@ export async function GET(
   return api(async () => {
     const { module, id } = await ctx.params;
     const name = collection(module),
-      user = await authorize(name);
+      user = await authorizeResource(name);
     const row = await delegate(name).findUnique({
       where: { id },
       include: resources[name].include,
@@ -46,7 +47,7 @@ export async function PATCH(
     csrf(req);
     const { module, id } = await ctx.params;
     const name = collection(module),
-      user = await authorize(name, name !== "notifications");
+      user = await authorizeResource(name, name !== "notifications");
     const input = await json(req);
     if (name === "notifications") {
       const row = await db.notification.findFirst({

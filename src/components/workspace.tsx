@@ -26,17 +26,28 @@ import {
   Typography,
 } from "@mui/material";
 import { type ModuleConfig, pretty } from "@/lib/ui-config";
+import CommercialActions from "./commercial-actions";
 import { RecordForm } from "./record-form";
 type Row = Record<string, unknown>;
 const groups: Record<string, [string, string][]> = {
+  rfqs: [
+    ["rfqs", "RFQs"],
+    ["quotes", "Quotations & revisions"],
+    ["rfq-followups", "Follow-ups"],
+    ["comparisons", "Commercial assumptions"],
+    ["comparison", "Compare options"],
+  ],
   customers: [
     ["customers", "Customers"],
     ["manufacturers", "Manufacturers"],
     ["products", "Products"],
+    ["manufacturer-contacts", "Manufacturer contacts"],
   ],
   tenders: [
     ["tenders", "Tenders"],
     ["requirements", "Technical compliance"],
+    ["decisions", "Go / No-Go"],
+    ["results", "Win / Loss"],
   ],
   deliveries: [
     ["deliveries", "Dispatch & delivery"],
@@ -230,6 +241,52 @@ export default function Workspace({
     const timer = setTimeout(() => void load(), 200);
     return () => clearTimeout(timer);
   }, [load]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search),
+      from = params.get("from"),
+      id = params.get("id");
+    if (!writable || !id || !from || !["rfqs", "quotes"].includes(module))
+      return;
+    const control = new AbortController();
+    fetch(`/api/lookups/${from}?for=${module}&ids=${encodeURIComponent(id)}`, {
+      signal: control.signal,
+    })
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        const source = d.rows[0];
+        if (!source) throw new Error("Source record not found");
+        const seed: Row = { __new: true };
+        if (from === "customers") seed.customerId = id;
+        if (from === "tenders")
+          Object.assign(seed, {
+            tenderId: id,
+            customerId: source.customerId,
+            productName: source.items[0]?.equipment,
+            model: source.items[0]?.model,
+            quantity: source.items[0]?.quantity,
+            manufacturerId: source.items[0]?.manufacturerId,
+            warrantyRequirement: source.warrantyTerms,
+            tenderDeadline: source.deadline,
+          });
+        if (from === "rfqs")
+          Object.assign(seed, {
+            rfqId: id,
+            tenderId: source.tenderId,
+            manufacturerId: source.manufacturerId,
+            productId: source.productId,
+            productName: source.productName,
+            model: source.model,
+            quantity: source.quantity,
+            warranty: source.warrantyRequirement,
+          });
+        setForm(seed);
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") setError(e.message);
+      });
+    return () => control.abort();
+  }, [module, writable]);
   const tabs = Object.entries(groups).find(
     ([parent, children]) =>
       parent === module || children.some(([child]) => child === module),
@@ -266,7 +323,8 @@ export default function Workspace({
             onClick={() => setForm(null)}
             sx={{ alignSelf: "center", whiteSpace: "nowrap" }}
           >
-            Add {module === "company" ? "company profile" : "record"}
+            {config.createLabel ??
+              (module === "company" ? "Add company profile" : "Add record")}
           </Button>
         )}
       </Stack>
@@ -452,6 +510,7 @@ export default function Workspace({
                       </Button>
                       {writable &&
                         !config.readOnly &&
+                        !config.immutable &&
                         ![
                           "payments",
                           "invoices",
@@ -500,7 +559,7 @@ export default function Workspace({
         fullWidth
       >
         <DialogTitle>
-          {form ? "Edit" : "Create"} {config.title.toLowerCase()}
+          {form && !form.__new ? "Edit" : "Create"} {config.title.toLowerCase()}
         </DialogTitle>
         <DialogContent>
           {form !== false && (
@@ -627,6 +686,19 @@ export default function Workspace({
                   </Button>
                 </Stack>
               )}
+              <CommercialActions
+                module={module}
+                row={detail}
+                writable={writable}
+                onNew={(seed) => {
+                  setDetail(null);
+                  setForm({ ...seed, __new: true });
+                }}
+                onChanged={() => {
+                  setDetail(null);
+                  void load();
+                }}
+              />
               {config.files && (
                 <>
                   <Divider />

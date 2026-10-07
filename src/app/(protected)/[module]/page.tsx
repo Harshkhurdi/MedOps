@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Workspace from "@/components/workspace";
 import { configs } from "@/lib/ui-config";
-import { authorize, can } from "@/lib/auth";
+import { authorizeResource, canResource } from "@/lib/record-access";
 export default async function ModulePage({
   params,
 }: {
@@ -11,7 +11,7 @@ export default async function ModulePage({
   if (!configs[module]) notFound();
   let user;
   try {
-    user = await authorize(module);
+    user = await authorizeResource(module);
   } catch {
     return (
       <p>You do not have access to this module. Contact your administrator.</p>
@@ -21,7 +21,7 @@ export default async function ModulePage({
     <Workspace
       module={module}
       config={configs[module]}
-      writable={can(user, module, true)}
+      writable={canResource(user, module, true)}
     />
   );
 }

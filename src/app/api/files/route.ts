@@ -1,7 +1,8 @@
+import { authorizeResource } from "@/lib/record-access";
 import path from "node:path";
 import { z } from "zod";
 import { api, AppError } from "@/lib/errors";
-import { authorize, csrf } from "@/lib/auth";
+import { csrf } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { collection, delegate } from "@/lib/resources";
 import {
@@ -13,6 +14,8 @@ import {
   limitedFormData,
 } from "@/lib/storage";
 const links: Record<string, string> = {
+  rfqs: "rfqId",
+  quotes: "quotationId",
   documents: "companyDocumentId",
   tenders: "tenderId",
   requirements: "requirementId",
@@ -28,7 +31,7 @@ export async function GET(req: Request) {
     const p = new URL(req.url).searchParams;
     const resource = collection(p.get("module") ?? ""),
       recordId = p.get("recordId") ?? "";
-    await authorize(resource);
+    await authorizeResource(resource);
     return Response.json(
       await db.storedFile.findMany({
         where: { module: resource, recordId },
@@ -53,7 +56,7 @@ export async function POST(req: Request) {
     const form = await limitedFormData(req);
     const resource = collection(z.string().parse(form.get("module"))),
       recordId = z.string().min(1).parse(form.get("recordId"));
-    const user = await authorize(resource, true);
+    const user = await authorizeResource(resource, true);
     if (!links[resource])
       throw new AppError(400, "Files cannot be attached to this resource");
     const parent = await delegate(resource).findUnique({

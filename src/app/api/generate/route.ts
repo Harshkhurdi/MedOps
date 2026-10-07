@@ -9,6 +9,7 @@ const input = z
   .object({
     templateId: z.string(),
     sourceModule: z.enum([
+      "rfqs",
       "tenders",
       "deliveries",
       "installations",
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
     if (!template?.approved)
       throw new AppError(400, "Select an administrator-approved template");
     const allowed: Record<string, string[]> = {
+      rfqs: ["RFQ_LETTER", "CUSTOM"],
       tenders: [
         "COVERING_LETTER",
         "NON_BLACKLISTING",
@@ -69,6 +71,29 @@ export async function POST(req: Request) {
         evidenceNotes?: string | null;
       }[] = [],
       tenderId: string | undefined;
+    if (data.sourceModule === "rfqs") {
+      const r = await db.rfq.findUnique({
+        where: { id: data.sourceId },
+        include: { manufacturer: true, customer: true, contact: true },
+      });
+      if (!r) throw new AppError(404, "RFQ not found");
+      defaults = {
+        ...defaults,
+        rfq_number: r.number,
+        manufacturer_name: r.manufacturer.name,
+        contact_name: r.contact?.name ?? "",
+        hospital_name: r.customer?.name ?? "",
+        equipment_name: r.productName,
+        model_number: r.model ?? "",
+        quantity: String(r.quantity),
+        accessories: r.accessories ?? "",
+        warranty_period: r.warrantyRequirement ?? "",
+        delivery_location: r.deliveryLocation ?? "",
+        delivery_time: r.requiredDeliveryTime ?? "",
+        quote_required_by: r.quoteRequiredBy?.toISOString().slice(0, 10) ?? "",
+        report_notes: r.notes ?? "",
+      };
+    }
     if (data.sourceModule === "tenders") {
       const t = await db.tender.findUnique({
         where: { id: data.sourceId },
@@ -84,7 +109,7 @@ export async function POST(req: Request) {
       defaults = {
         ...defaults,
         tender_number: t.number,
-        hospital_name: t.customer.name,
+        hospital_name: t.customer?.name ?? "",
         equipment_name: t.items.map((i) => i.equipment).join(", "),
         manufacturer_name: t.items
           .map((i) => i.manufacturer?.name ?? "")
