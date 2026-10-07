@@ -437,3 +437,16 @@ it("includes due commercial, delivery, AMC and financial actions and retires com
     await todaysBrief(restricted, new URLSearchParams({ module: "amcs" }), now),
   ).toEqual([]);
 });
+
+it("rejects impossible historical dates during import preview without normalizing or creating records", async () => {
+  const name = `Invalid-calendar-import-${suffix}`;
+  const batch = await previewImport(admin, {
+    module: "customers",
+    headers: ["name", "originalDate"],
+    rows: [[name, "2026-02-30"]],
+    mapping: { name: "name", originalDate: "originalDate" },
+  });
+  expect(batch.preview[0].status).toBe("REJECTED");
+  expect((await confirmImport(admin, batch.id)).rejectedCount).toBe(1);
+  expect(await db.customer.count({ where: { name } })).toBe(0);
+});

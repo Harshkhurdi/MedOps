@@ -1,3 +1,4 @@
+import { calendarDate } from "./date-schema";
 import { revenueSchemas } from "./revenue";
 import { serviceSchemas } from "./service-operations";
 import { controlSchemas } from "./controls";
@@ -8,7 +9,7 @@ const text = z.string().trim().min(1).max(500);
 const notes = z.string().max(10000).optional().nullable();
 const id = text;
 const optionalId = id.optional().nullable();
-const date = z.coerce.date();
+const date = calendarDate;
 const optionalDate = date.optional().nullable();
 const cash = z
   .union([z.string(), z.number()])

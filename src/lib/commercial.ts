@@ -1,3 +1,4 @@
+import { calendarDate } from "./date-schema";
 import { z } from "zod";
 import { cents } from "./business";
 import { AppError } from "./errors";
@@ -16,7 +17,7 @@ export const rfqStatuses = [
 export const text = z.string().trim().min(1).max(500);
 export const optionalText = z.string().trim().max(10000).nullable().optional();
 export const optionalId = text.nullable().optional();
-export const date = z.coerce.date();
+export const date = calendarDate;
 export const optionalDate = date.nullable().optional();
 export const cash = z
   .union([z.string(), z.number()])
@@ -174,7 +175,7 @@ export const commercialSchemas = {
       winner: optionalText,
       winningPrice: cash.nullable().optional(),
       competitorName: optionalText,
-      competitorId:optionalId,
+      competitorId: optionalId,
       reason: optionalText,
       notes: optionalText,
       ...provenance,

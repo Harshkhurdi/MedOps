@@ -1,3 +1,5 @@
+import { schemas } from "@/lib/schemas";
+import { calendarDate } from "@/lib/date-schema";
 import { it, expect, vi, afterEach } from "vitest";
 import ExcelJS from "exceljs";
 import { parseCsv, readImportFile } from "@/lib/import-file";
@@ -78,4 +80,40 @@ it("validates report date ranges", () => {
       new URLSearchParams({ from: "2026-01-01", to: "2026-01-31" }),
     ).end?.toISOString(),
   ).toBe("2026-01-31T23:59:59.999Z");
+});
+
+it("rejects impossible calendar dates and preserves leap days and explicit timestamp offsets", () => {
+  for (const invalid of [
+    "2026-02-30",
+    "2026-02-29",
+    "2026-04-31",
+    "2026-02-30T09:00:00Z",
+    "2026-01-01T25:00:00Z",
+    "2026-10-07T09:00",
+  ])
+    expect(calendarDate.safeParse(invalid).success, invalid).toBe(false);
+  expect(calendarDate.parse("2024-02-29").toISOString()).toBe(
+    "2024-02-29T00:00:00.000Z",
+  );
+  expect(calendarDate.parse("2026-10-07T09:00:00+05:30").toISOString()).toBe(
+    "2026-10-07T03:30:00.000Z",
+  );
+  const original = new Date("2020-01-01T00:00:00Z");
+  expect(calendarDate.parse(original)).toEqual(original);
+  expect(
+    schemas.customers.safeParse({
+      name: "Synthetic date validation",
+      historical: true,
+      originalDate: "2026-02-30",
+    }).success,
+  ).toBe(false);
+  expect(
+    schemas.rfqs.safeParse({
+      number: "Synthetic",
+      manufacturerId: "test",
+      productName: "Synthetic",
+      quantity: 1,
+      quoteRequiredBy: "2026-02-30",
+    }).success,
+  ).toBe(false);
 });
