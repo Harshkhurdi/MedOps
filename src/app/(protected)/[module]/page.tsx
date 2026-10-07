@@ -1,3 +1,4 @@
+import { MODULES, can } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Workspace from "@/components/workspace";
 import { configs } from "@/lib/ui-config";
@@ -22,6 +23,14 @@ export default async function ModulePage({
       module={module}
       config={configs[module]}
       writable={canResource(user, module, true)}
+      canExport={can(user, "exports", true)}
+      allowedModules={MODULES.filter((m) => canResource(user, m)).map((m) =>
+        m === "generated"
+          ? "generator"
+          : m === "comparisons"
+            ? "comparison"
+            : m,
+      )}
     />
   );
 }

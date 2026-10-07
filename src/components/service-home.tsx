@@ -35,6 +35,9 @@ export default function ServiceHome({ sla = false }: { sla?: boolean }) {
       <Typography variant="h4">
         {sla ? "Service SLA" : "Engineer home"}
       </Typography>
+      {sla && (
+        <Button href="/api/service/export?format=xlsx">Export SLA Excel</Button>
+      )}
       {error && <Alert severity="error">{error}</Alert>}
       {!data && !error && <Typography>Loading service records…</Typography>}
       {sla && data && (

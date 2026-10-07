@@ -4,13 +4,13 @@ Baseline: main `33c2a7445deedaf6dcead1c595e30d166b3456ee`, clean checkout, 7 Oct
 
 Implementation proceeds A → B → C → D → E. Each phase must pass existing and new tests, quality checks, build and smoke verification before the next phase. Stable phases are pushed normally and deployed after an encrypted backup and safe migration validation. AI stays disabled by default; no automatic LLM processing is added.
 
-| Phase                          | Status      |
-| ------------------------------ | ----------- |
-| A: Commercial tender workflow  | In progress |
-| B: Tender controls             | Pending     |
-| C: Service and installed base  | Pending     |
-| D: CRM and revenue             | Pending     |
-| E: Productivity and management | Pending     |
+| Phase                          | Status              |
+| ------------------------------ | ------------------- |
+| A: Commercial tender workflow  | Verified production |
+| B: Tender controls             | Verified production |
+| C: Service and installed base  | Verified production |
+| D: CRM and revenue             | Validated locally   |
+| E: Productivity and management | Validated locally   |
 
 Historical entry will be explicit, restricted to administrators, retain original dates/provenance and preserve relationship checks and financial safeguards. Optional integrations must fail clearly and leave manual entry available.
 
@@ -23,3 +23,9 @@ Phase B: 32 unit/document, 12 integration and 5 browser/API tests passed (49 tot
 Phase B release: `030761045a2293a60fa6d6827165ddfbbfe63ead`, deployment `dpl_CMP32K8zaFCvaBqhRcJeV5jfDbtD`. Live securities/checklist/approval/communication screens, data/storage, exports, anonymous access denial, email unavailable status, disabled AI and no external browser traffic passed. No fictional production business records created.
 
 Phase C: 35 unit/document, 18 integration and 6 browser/API tests passed (59 total, baseline 33 + 26). Types, ESLint, production build and migration consistency passed. Acceptance covers manual legacy equipment, explicit warranty dates/month clamping, tickets, engineer visits, draft restore, actual SLA, stock reservations/consumption/negative-adjustment authorization/concurrent issues/duplicate rollback, compatibility rules and AMC opportunity retirement under actual coverage. DOCX/PDF reports are generated and downloaded privately. PWA manifest and icons are present; online access is required and business records are not cached offline.
+
+Phase C release: `8dba7eac52ad52e56c44944e8639c5ba12715747`, deployment `dpl_AUW2puDsvPHy9sN77ah17RpKePc1`. Live service/engineer/parts/AMC/SLA screens, login/dashboard, database and private storage, exports, reminders, public access denial, session revocation and disabled AI passed. GitHub publication initially returned HTTP500, then the normal non-force push succeeded. No fictional production business records were created.
+
+Phases D/E: CRM, historical finance, immutable financial corrections, contribution/performance reports, executive metrics, search, daily brief, controlled imports, accounting interchange, optional private OCR, grouped navigation, safe audits and action permissions implemented. The complete manual A–E browser acceptance scenario passed locally, including product/manufacturer/customer reporting, CRM, search and daily actions. Final regression/build/release checks are still required before a production-completion claim.
+
+Final local expansion validation: 43 unit/document + 31 PostgreSQL integration + 8 browser/API = 82 passed, 0 failed (original baseline 33; 49 additional tests). Full lifecycle, searches for all ten required record types and due/completed daily actions were exercised. TypeScript, ESLint and Prisma validation passed. Production build passed; all ten migrations replayed successfully in a fresh isolated local database with no schema differences. Deployment verification pending. Phases D/E share financial corrections, permission-filtered reports and import validation, and are being finalized as a combined release after the earlier individually verified A/B/C releases.

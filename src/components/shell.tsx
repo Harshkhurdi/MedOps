@@ -1,4 +1,5 @@
 "use client";
+import GlobalSearch from "./global-search";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -11,6 +12,7 @@ import {
   Divider,
   Drawer,
   List,
+  Collapse,
   ListItemButton,
   ListItemText,
   Toolbar,
@@ -24,31 +26,84 @@ type SafeUser = {
   permissions: { module: string; read: boolean; write: boolean }[];
 };
 const navigation = [
-  ["dashboard", "Dashboard"],
-  ["tasks", "Tasks & follow-ups"],
-  ["reports", "Reports"],
-  ["ai", "AI writing assistant"],
-  ["tenders", "Tenders"],
-  ["rfqs", "RFQs & quotations"],
-  ["comparison", "Commercial comparison"],
-  ["generator", "Document generator"],
-  ["securities", "Securities / EMD / PBG"],
-  ["approvals", "Approvals"],
-  ["communication", "Email & WhatsApp"],
-  ["orders", "Purchase orders"],
-  ["deliveries", "Deliveries & installations"],
-  ["warranties", "Warranty management"],
-  ["equipment", "Installed base"],
-  ["tickets", "Service tickets"],
-  ["engineer", "Engineer home"],
-  ["parts", "Spare parts"],
-  ["consumables", "Consumables"],
-  ["amcs", "AMC management"],
-  ["invoices", "Payments & receivables"],
-  ["documents", "Company documents"],
-  ["customers", "Customers & manufacturers"],
-  ["notifications", "Notifications"],
-  ["settings", "Settings"],
+  {
+    title: "Dashboard",
+    items: [
+      ["dashboard", "Operations dashboard"],
+      ["brief", "Today’s brief"],
+      ["executive", "Executive dashboard"],
+      ["tasks", "Tasks & follow-ups"],
+      ["notifications", "Notifications"],
+    ],
+  },
+  {
+    title: "Tenders & commercial",
+    items: [
+      ["tenders", "Tenders & decisions"],
+      ["rfqs", "RFQs & quotations"],
+      ["comparison", "Commercial comparison"],
+      ["securities", "Securities / EMD / PBG"],
+      ["approvals", "Approvals"],
+      ["communication", "Email & WhatsApp"],
+      ["generator", "Document generator"],
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      ["orders", "Purchase orders"],
+      ["deliveries", "Deliveries & installations"],
+      ["equipment", "Installed base"],
+    ],
+  },
+  {
+    title: "Service",
+    items: [
+      ["tickets", "Service tickets & SLA"],
+      ["engineer", "Engineer home"],
+      ["warranties", "Warranty management"],
+      ["parts", "Spare parts & stock"],
+      ["amcs", "AMC & opportunities"],
+      ["consumables", "Consumables & opportunities"],
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      ["invoices", "Invoices & receivables"],
+      ["adjustments", "Financial corrections"],
+      ["costs", "Operational costs"],
+      ["profitability", "Operational profitability"],
+      ["accounting", "Accounting exports"],
+    ],
+  },
+  {
+    title: "Sales / CRM",
+    items: [
+      ["customers", "Customers & manufacturers"],
+      ["customer-contacts", "Customer contacts"],
+      ["interactions", "Customer interactions"],
+      ["pipeline", "Sales pipeline"],
+      ["competitors", "Competitors"],
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      ["analytics", "Performance analytics"],
+      ["reports", "Reports & registers"],
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      ["documents", "Company documents"],
+      ["imports", "Historical imports"],
+      ["ocr", "Private OCR"],
+      ["ai", "AI writing assistant"],
+      ["settings", "Settings"],
+    ],
+  },
 ];
 export default function Shell({
   user,
@@ -59,7 +114,8 @@ export default function Shell({
 }) {
   const router = useRouter();
   const pathname = usePathname(),
-    [mobile, setMobile] = useState(false);
+    [mobile, setMobile] = useState(false),
+    [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const allowed = (m: string) =>
     user.role === "ADMIN" ||
     user.permissions.some(
@@ -84,26 +140,55 @@ export default function Shell({
       <Divider sx={{ borderColor: "#2a4653" }} />
       <List sx={{ px: 1.5 }}>
         {navigation
-          .filter(([m]) => allowed(m))
-          .map(([m, title]) => (
-            <ListItemButton
-              key={m}
-              component={Link}
-              href={"/" + m}
-              selected={pathname.startsWith("/" + m)}
-              onClick={() => setMobile(false)}
-              sx={{
-                borderRadius: 1,
-                mb: 0.5,
-                "&.Mui-selected": { bgcolor: "#22534f", color: "#9bf1da" },
-                "&.Mui-selected:hover": { bgcolor: "#22534f" },
-              }}
-            >
-              <ListItemText
-                primary={title}
-                slotProps={{ primary: { sx: { fontSize: 14 } } }}
-              />
-            </ListItemButton>
+          .filter((g) => g.items.some(([m]) => allowed(m)))
+          .map((g) => (
+            <Box key={g.title}>
+              <ListItemButton
+                onClick={() =>
+                  setCollapsed((c) => ({ ...c, [g.title]: !c[g.title] }))
+                }
+                aria-expanded={!collapsed[g.title]}
+                sx={{ color: "#8ba6b3", py: 1 }}
+              >
+                <ListItemText
+                  primary={g.title}
+                  slotProps={{
+                    primary: { sx: { fontSize: 12, fontWeight: 700 } },
+                  }}
+                />
+                <Typography variant="caption">
+                  {collapsed[g.title] ? "+" : "−"}
+                </Typography>
+              </ListItemButton>
+              <Collapse in={!collapsed[g.title]}>
+                {g.items
+                  .filter(([m]) => allowed(m))
+                  .map(([m, title]) => (
+                    <ListItemButton
+                      key={m}
+                      component={Link}
+                      href={"/" + m}
+                      selected={pathname.startsWith("/" + m)}
+                      onClick={() => setMobile(false)}
+                      sx={{
+                        borderRadius: 1,
+                        mb: 0.5,
+                        pl: 3,
+                        "&.Mui-selected": {
+                          bgcolor: "#22534f",
+                          color: "#9bf1da",
+                        },
+                        "&.Mui-selected:hover": { bgcolor: "#22534f" },
+                      }}
+                    >
+                      <ListItemText
+                        primary={title}
+                        slotProps={{ primary: { sx: { fontSize: 14 } } }}
+                      />
+                    </ListItemButton>
+                  ))}
+              </Collapse>
+            </Box>
           ))}
       </List>
       <Box sx={{ p: 3 }}>
@@ -157,6 +242,7 @@ export default function Shell({
             <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
               Company operations / {pathname.split("/")[1]}
             </Typography>
+            {allowed("search") && <GlobalSearch />}
             <Avatar
               sx={{
                 width: 30,

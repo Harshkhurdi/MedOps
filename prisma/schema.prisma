@@ -133,6 +133,14 @@ model CompanyProfile {
 }
 
 model Customer {
+  contacts                CustomerContact[]
+  interactions            CustomerInteraction[]
+  opportunities           SalesOpportunity[]
+  costs                   OperationalCost[]
+  competitorLinks         CompetitorCustomer[]
+  historical              Boolean                 @default(false)
+  originalDate            DateTime?               @db.Date
+  recordSource            String                  @default("MANUAL")
   tickets                 ServiceTicket[]
   amcOpportunities        AmcOpportunity[]
   consumableOpportunities ConsumableOpportunity[]
@@ -158,29 +166,41 @@ model Customer {
 }
 
 model Manufacturer {
-  installed   Equipment[]
-  tickets     ServiceTicket[]
-  parts       SparePart[]
-  consumables Consumable[]
-  slaRules    SlaRule[]
-  id          String                @id @default(cuid())
-  name        String                @unique
-  email       String?
-  phone       String?
-  contactName String?
-  notes       String?
-  contacts    ManufacturerContact[]
-  rfqs        Rfq[]
-  quoteSeries QuoteSeries[]
-  products    Product[]
-  tenderItems TenderItem[]
-  orderItems  PurchaseOrderItem[]
-  documents   CompanyDocument[]
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  opportunities SalesOpportunity[]
+  costs         OperationalCost[]
+  historical    Boolean               @default(false)
+  originalDate  DateTime?             @db.Date
+  recordSource  String                @default("MANUAL")
+  installed     Equipment[]
+  tickets       ServiceTicket[]
+  parts         SparePart[]
+  consumables   Consumable[]
+  slaRules      SlaRule[]
+  id            String                @id @default(cuid())
+  name          String                @unique
+  email         String?
+  phone         String?
+  contactName   String?
+  notes         String?
+  contacts      ManufacturerContact[]
+  rfqs          Rfq[]
+  quoteSeries   QuoteSeries[]
+  products      Product[]
+  tenderItems   TenderItem[]
+  orderItems    PurchaseOrderItem[]
+  documents     CompanyDocument[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 }
 
 model Product {
+  tenderItems    TenderItem[]
+  orderItems     PurchaseOrderItem[]
+  opportunities  SalesOpportunity[]
+  costs          OperationalCost[]
+  historical     Boolean                   @default(false)
+  originalDate   DateTime?                 @db.Date
+  recordSource   String                    @default("MANUAL")
   installed      Equipment[]
   consumables    ConsumableCompatibility[]
   id             String                    @id @default(cuid())
@@ -216,6 +236,8 @@ model CompanyDocument {
 }
 
 model Tender {
+  opportunities   SalesOpportunity[]
+  costs           OperationalCost[]
   securities      Security[]
   checklist       BidChecklist[]
   id              String                 @id @default(cuid())
@@ -260,6 +282,8 @@ model Tender {
 }
 
 model TenderItem {
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id])
   id             String        @id @default(cuid())
   tenderId       String
   tender         Tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
@@ -328,6 +352,10 @@ model GeneratedDocument {
 }
 
 model PurchaseOrder {
+  costs            OperationalCost[]
+  historical       Boolean             @default(false)
+  originalDate     DateTime?           @db.Date
+  recordSource     String              @default("MANUAL")
   securities       Security[]
   id               String              @id @default(cuid())
   number           String              @unique
@@ -354,6 +382,8 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
+  productId      String?
+  product        Product?       @relation(fields: [productId], references: [id])
   id             String         @id @default(cuid())
   orderId        String
   order          PurchaseOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -371,22 +401,23 @@ model PurchaseOrderItem {
 }
 
 model Delivery {
-  id           String         @id @default(cuid())
+  costs        OperationalCost[]
+  id           String            @id @default(cuid())
   orderId      String
-  order        PurchaseOrder  @relation(fields: [orderId], references: [id])
-  dispatchDate DateTime?      @db.Date
+  order        PurchaseOrder     @relation(fields: [orderId], references: [id])
+  dispatchDate DateTime?         @db.Date
   transporter  String?
   tracking     String?
-  expectedDate DateTime?      @db.Date
-  actualDate   DateTime?      @db.Date
+  expectedDate DateTime?         @db.Date
+  actualDate   DateTime?         @db.Date
   location     String
-  confirmed    Boolean        @default(false)
+  confirmed    Boolean           @default(false)
   notes        String?
   items        DeliveryItem[]
   equipment    Equipment[]
   files        StoredFile[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([orderId])
 }
@@ -440,6 +471,7 @@ model Equipment {
 }
 
 model Installation {
+  costs             OperationalCost[]
   historical        Boolean            @default(false)
   originalDate      DateTime?          @db.Date
   recordSource      String             @default("MANUAL")
@@ -488,6 +520,9 @@ model WarrantyHistory {
 }
 
 model AmcContract {
+  historical             Boolean          @default(false)
+  originalDate           DateTime?        @db.Date
+  recordSource           String           @default("MANUAL")
   slaRules               SlaRule[]
   opportunities          AmcOpportunity[]
   id                     String           @id @default(cuid())
@@ -525,6 +560,9 @@ model AmcEquipment {
 }
 
 model ServiceVisit {
+  historical    Boolean      @default(false)
+  originalDate  DateTime?    @db.Date
+  recordSource  String       @default("MANUAL")
   id            String       @id @default(cuid())
   amcId         String
   amc           AmcContract  @relation(fields: [amcId], references: [id])
@@ -541,39 +579,47 @@ model ServiceVisit {
 }
 
 model Invoice {
-  id              String            @id @default(cuid())
-  number          String            @unique
+  adjustments     FinancialAdjustment[]
+  historical      Boolean               @default(false)
+  originalDate    DateTime?             @db.Date
+  recordSource    String                @default("MANUAL")
+  id              String                @id @default(cuid())
+  number          String                @unique
   customerId      String
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  orderId         String
-  order           PurchaseOrder     @relation(fields: [orderId], references: [id])
-  invoiceDate     DateTime          @db.Date
-  amount          Decimal           @db.Decimal(18, 2)
-  taxAmount       Decimal           @db.Decimal(18, 2)
-  total           Decimal           @db.Decimal(18, 2)
+  customer        Customer              @relation(fields: [customerId], references: [id])
+  orderId         String?
+  order           PurchaseOrder?        @relation(fields: [orderId], references: [id])
+  invoiceDate     DateTime              @db.Date
+  amount          Decimal               @db.Decimal(18, 2)
+  taxAmount       Decimal               @db.Decimal(18, 2)
+  total           Decimal               @db.Decimal(18, 2)
   paymentTermDays Int
-  dueDate         DateTime          @db.Date
+  dueDate         DateTime              @db.Date
   notes           String?
   payments        Payment[]
   followUps       PaymentFollowUp[]
   files           StoredFile[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@index([dueDate])
 }
 
 model Payment {
-  id          String   @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
-  amount      Decimal  @db.Decimal(18, 2)
-  paymentDate DateTime @db.Date
-  reference   String
-  method      String
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  adjustments  FinancialAdjustment[]
+  historical   Boolean               @default(false)
+  originalDate DateTime?             @db.Date
+  recordSource String                @default("MANUAL")
+  id           String                @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice               @relation(fields: [invoiceId], references: [id])
+  amount       Decimal               @db.Decimal(18, 2)
+  paymentDate  DateTime              @db.Date
+  reference    String
+  method       String
+  notes        String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   @@index([invoiceId])
 }
@@ -603,6 +649,8 @@ model Notification {
   recordId    String
   title       String
   priority    String
+  reminderAt  DateTime?
+  completedAt DateTime?
   readAt      DateTime?
   dismissedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -610,6 +658,7 @@ model Notification {
 
   @@unique([userId, key])
   @@index([userId, readAt])
+  @@index([userId, completedAt, dismissedAt, reminderAt])
 }
 
 model AuditLog {
@@ -895,22 +944,24 @@ model CommercialComparison {
 }
 
 model TenderResult {
-  id             String    @id @default(cuid())
+  competitorId   String?
+  competitor     Competitor? @relation(fields: [competitorId], references: [id])
+  id             String      @id @default(cuid())
   tenderId       String
-  tender         Tender    @relation(fields: [tenderId], references: [id])
+  tender         Tender      @relation(fields: [tenderId], references: [id])
   outcome        String
-  resultDate     DateTime  @db.Date
+  resultDate     DateTime    @db.Date
   winner         String?
-  winningPrice   Decimal?  @db.Decimal(18, 2)
+  winningPrice   Decimal?    @db.Decimal(18, 2)
   competitorName String?
   reason         String?
   notes          String?
   recordedBy     String
-  historical     Boolean   @default(false)
-  originalDate   DateTime? @db.Date
-  recordSource   String    @default("MANUAL")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  historical     Boolean     @default(false)
+  originalDate   DateTime?   @db.Date
+  recordSource   String      @default("MANUAL")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@index([tenderId, resultDate])
 }
@@ -1025,6 +1076,7 @@ model MailLog {
 }
 
 model ServiceTicket {
+  costs           OperationalCost[]
   id              String                 @id @default(cuid())
   number          String                 @unique
   customerId      String
@@ -1225,4 +1277,171 @@ model InventoryTransaction {
 
   @@index([partId, transactionDate])
   @@index([ticketId])
+}
+
+model CustomerContact {
+  id               String                @id @default(cuid())
+  customerId       String
+  customer         Customer              @relation(fields: [customerId], references: [id])
+  name             String
+  designation      String?
+  department       String?
+  phone            String?
+  email            String?
+  preferredChannel String                @default("EMAIL")
+  active           Boolean               @default(true)
+  notes            String?
+  interactions     CustomerInteraction[]
+  historical       Boolean               @default(false)
+  originalDate     DateTime?             @db.Date
+  recordSource     String                @default("MANUAL")
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([customerId, active])
+}
+
+model CustomerInteraction {
+  id            String           @id @default(cuid())
+  customerId    String
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  contactId     String?
+  contact       CustomerContact? @relation(fields: [contactId], references: [id])
+  employeeId    String
+  type          String
+  occurredAt    DateTime
+  nextFollowUp  DateTime?
+  relatedModule String?
+  recordId      String?
+  notes         String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([customerId, occurredAt])
+  @@index([employeeId, nextFollowUp])
+}
+
+model SalesOpportunity {
+  id             String        @id @default(cuid())
+  title          String
+  type           String
+  stage          String        @default("IDENTIFIED")
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id])
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id])
+  tenderId       String?
+  tender         Tender?       @relation(fields: [tenderId], references: [id])
+  estimatedValue Decimal?      @db.Decimal(18, 2)
+  probability    Int?
+  expectedClose  DateTime?     @db.Date
+  assignedToId   String?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([customerId, stage])
+  @@index([assignedToId, expectedClose])
+}
+
+model Competitor {
+  id         String               @id @default(cuid())
+  company    String               @unique
+  brands     String?
+  categories String?
+  notes      String?
+  results    TenderResult[]
+  customers  CompetitorCustomer[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+}
+
+model CompetitorCustomer {
+  id           String     @id @default(cuid())
+  competitorId String
+  competitor   Competitor @relation(fields: [competitorId], references: [id])
+  customerId   String
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  category     String?
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([customerId, competitorId])
+}
+
+model OperationalCost {
+  id             String         @id @default(cuid())
+  title          String
+  category       String
+  amount         Decimal        @db.Decimal(18, 2)
+  incurredDate   DateTime       @db.Date
+  customerId     String
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  manufacturerId String?
+  manufacturer   Manufacturer?  @relation(fields: [manufacturerId], references: [id])
+  productId      String?
+  product        Product?       @relation(fields: [productId], references: [id])
+  tenderId       String?
+  tender         Tender?        @relation(fields: [tenderId], references: [id])
+  orderId        String?
+  order          PurchaseOrder? @relation(fields: [orderId], references: [id])
+  deliveryId     String?
+  delivery       Delivery?      @relation(fields: [deliveryId], references: [id])
+  installationId String?
+  installation   Installation?  @relation(fields: [installationId], references: [id])
+  ticketId       String?
+  ticket         ServiceTicket? @relation(fields: [ticketId], references: [id])
+  employeeId     String?
+  serviceCost    Boolean        @default(false)
+  postSale       Boolean        @default(false)
+  notes          String?
+  historical     Boolean        @default(false)
+  originalDate   DateTime?      @db.Date
+  recordSource   String         @default("MANUAL")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([customerId, incurredDate])
+  @@index([orderId, category])
+  @@index([manufacturerId, productId])
+}
+
+model FinancialAdjustment {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id])
+  paymentId      String?
+  payment        Payment? @relation(fields: [paymentId], references: [id])
+  type           String
+  amount         Decimal  @db.Decimal(18, 2)
+  taxAmount      Decimal  @default(0) @db.Decimal(18, 2)
+  adjustmentDate DateTime @db.Date
+  reference      String
+  reason         String
+  actorId        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([invoiceId, reference])
+  @@index([invoiceId, adjustmentDate])
+}
+
+model BulkImport {
+  id         String    @id @default(cuid())
+  module     String
+  ownerId    String
+  payload    Json
+  preview    Json
+  report     Json      @default("[]")
+  status     String    @default("PREVIEW")
+  runId      String?
+  leaseUntil DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([ownerId, status, expiresAt])
 }

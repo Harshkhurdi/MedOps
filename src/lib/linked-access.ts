@@ -7,7 +7,8 @@ export function assertLinkedAccess(
   row: Record<string, unknown>,
 ) {
   if (
-    ["approvals", "mail"].includes(name) &&
+    ["approvals", "mail", "interactions"].includes(name) &&
+    row.relatedModule &&
     !canResource(user, String(row.relatedModule))
   )
     throw new AppError(403, "Related record access is required");

@@ -3,6 +3,9 @@ import { api, AppError } from "@/lib/errors";
 import { currentUser } from "@/lib/auth";
 import { collection, delegate } from "@/lib/resources";
 const selections: Record<string, object> = {
+  "customer-contacts": { id: true, name: true, customerId: true, active: true },
+  competitors: { id: true, company: true },
+  payments: { id: true, reference: true, invoiceId: true },
   "sla-rules": { id: true, name: true, active: true },
   parts: {
     id: true,
@@ -119,6 +122,21 @@ const selections: Record<string, object> = {
   },
 };
 const dependencies: Record<string, string[]> = {
+  "customer-contacts": ["customers"],
+  interactions: ["customers", "customer-contacts"],
+  pipeline: ["customers", "manufacturers", "products", "tenders"],
+  "competitor-customers": ["customers", "competitors"],
+  costs: [
+    "customers",
+    "manufacturers",
+    "products",
+    "tenders",
+    "orders",
+    "deliveries",
+    "installations",
+    "tickets",
+  ],
+  adjustments: ["invoices", "payments"],
   tickets: ["customers", "equipment", "manufacturers", "sla-rules"],
   "ticket-visits": ["tickets"],
   "sla-rules": ["customers", "manufacturers", "amcs"],
@@ -132,7 +150,7 @@ const dependencies: Record<string, string[]> = {
   checklist: ["tenders"],
   approvals: [],
   decisions: ["tenders"],
-  results: ["tenders"],
+  results: ["tenders", "competitors"],
   "manufacturer-contacts": ["manufacturers"],
   rfqs: [
     "manufacturers",
@@ -147,9 +165,9 @@ const dependencies: Record<string, string[]> = {
   products: ["manufacturers"],
   documents: ["manufacturers"],
   company: ["documents"],
-  tenders: ["customers", "manufacturers"],
+  tenders: ["customers", "manufacturers", "products"],
   requirements: ["tenders"],
-  orders: ["tenders", "customers", "manufacturers"],
+  orders: ["tenders", "customers", "manufacturers", "products"],
   deliveries: ["orders"],
   equipment: ["deliveries", "orders", "customers", "manufacturers", "products"],
   installations: ["equipment"],
@@ -161,6 +179,9 @@ const dependencies: Record<string, string[]> = {
   followups: ["invoices"],
 };
 const searchFields: Record<string, string> = {
+  "customer-contacts": "name",
+  competitors: "company",
+  payments: "reference",
   tickets: "number",
   "ticket-visits": "workDone",
   "sla-rules": "name",
@@ -211,6 +232,12 @@ export async function GET(
     else if (ids.length) where.id = { in: ids };
     else if (q && searchFields[name])
       where[searchFields[name]] = { contains: q, mode: "insensitive" };
+    if (name === "customer-contacts") {
+      where.active = true;
+      if (params.get("customerId")) where.customerId = params.get("customerId");
+    }
+    if (name === "payments" && params.get("invoiceId"))
+      where.invoiceId = params.get("invoiceId");
     if (name === "manufacturer-contacts") {
       where.active = true;
       if (params.get("manufacturerId"))

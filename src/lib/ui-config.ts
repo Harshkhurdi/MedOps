@@ -1,3 +1,4 @@
+import { revenueConfigs } from "./revenue";
 import { serviceConfigs } from "./service-operations";
 import { controlConfigs } from "./controls";
 import { commercialConfigs, historicalFields } from "./commercial-config";
@@ -46,6 +47,7 @@ const rel = (key: string, label: string, source: string, required = true) =>
   f(key, label, "relation", required, undefined, source);
 const notes = f("notes", "Notes", "textarea");
 const tenderItems: Field[] = [
+  rel("productId", "Saved product (optional)", "products", false),
   f("equipment", "Equipment name", "text", true),
   f("model", "Model"),
   f("quantity", "Quantity", "number", true),
@@ -60,6 +62,7 @@ export const configs: Record<string, ModuleConfig> = {
   ...commercialConfigs,
   ...controlConfigs,
   ...serviceConfigs,
+  ...revenueConfigs,
   company: {
     title: "Company profile",
     description:
@@ -95,6 +98,7 @@ export const configs: Record<string, ModuleConfig> = {
       "Institutions, contacts and addresses shared across your workflow.",
     columns: ["name", "institutionType", "state", "email"],
     fields: [
+      ...historicalFields,
       f("name", "Institution name", "text", true),
       f("institutionType", "Institution type"),
       f("address", "Address", "textarea"),
@@ -110,6 +114,7 @@ export const configs: Record<string, ModuleConfig> = {
     description: "Manufacturer contacts and approved product information.",
     columns: ["name", "contactName", "email", "phone"],
     fields: [
+      ...historicalFields,
       f("name", "Manufacturer name", "text", true),
       f("contactName", "Contact person"),
       f("email", "Email", "email"),
@@ -122,6 +127,7 @@ export const configs: Record<string, ModuleConfig> = {
     description: "Equipment models and source-backed specifications.",
     columns: ["name", "model", "manufacturer", "category"],
     fields: [
+      ...historicalFields,
       f("name", "Product name", "text", true),
       f("model", "Model", "text", true),
       f("category", "Equipment category"),
@@ -265,6 +271,7 @@ export const configs: Record<string, ModuleConfig> = {
     columns: ["number", "customer", "status", "total", "deliveryDeadline"],
     files: true,
     fields: [
+      ...historicalFields,
       f("number", "Official PO number", "text", true),
       rel("tenderId", "Won tender (optional)", "tenders", false),
       rel("customerId", "Customer", "customers"),
@@ -431,6 +438,7 @@ export const configs: Record<string, ModuleConfig> = {
     ],
     files: true,
     fields: [
+      ...historicalFields,
       f("number", "AMC contract number", "text", true),
       rel("customerId", "Customer", "customers"),
       f("startDate", "Contract start", "date", true),
@@ -464,6 +472,7 @@ export const configs: Record<string, ModuleConfig> = {
     columns: ["amc", "scheduledDate", "completedDate", "status", "complaint"],
     files: true,
     fields: [
+      ...historicalFields,
       rel("amcId", "AMC contract", "amcs"),
       rel("employeeId", "Assigned employee", "employees", false),
       f("scheduledDate", "Scheduled date", "date", true),
@@ -487,13 +496,20 @@ export const configs: Record<string, ModuleConfig> = {
     columns: ["number", "customer", "total", "dueDate", "outstanding"],
     files: true,
     fields: [
+      ...historicalFields,
       f("number", "Invoice number", "text", true),
-      rel("orderId", "Purchase order", "orders"),
+      rel(
+        "orderId",
+        "Purchase order (optional for historical)",
+        "orders",
+        false,
+      ),
       rel("customerId", "Customer", "customers"),
       f("invoiceDate", "Invoice date", "date", true),
       f("amount", "Invoice base amount (INR)", "number", true),
       { ...f("taxAmount", "Tax amount (INR)", "number", true), default: "0" },
       f("paymentTermDays", "Payment terms (days)", "number", true),
+      f("dueDate", "Original due date (historical only)", "date"),
       notes,
     ],
   },
@@ -503,6 +519,7 @@ export const configs: Record<string, ModuleConfig> = {
       "Each receipt is retained separately; overpayments are blocked.",
     columns: ["invoice", "amount", "paymentDate", "reference", "method"],
     fields: [
+      ...historicalFields,
       rel("invoiceId", "Invoice", "invoices"),
       f("amount", "Amount received (INR)", "number", true),
       f("paymentDate", "Payment date", "date", true),
@@ -601,7 +618,16 @@ export function label(value: unknown): string {
   if (typeof value === "object") {
     const r = value as Record<string, unknown>;
     return String(
-      r.name ?? r.number ?? r.serialNumber ?? r.equipment ?? r.id ?? "—",
+      r.name ??
+        r.company ??
+        r.title ??
+        r.reference ??
+        r.sku ??
+        r.number ??
+        r.serialNumber ??
+        r.equipment ??
+        r.id ??
+        "—",
     );
   }
   return String(value);

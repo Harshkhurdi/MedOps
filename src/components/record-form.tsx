@@ -17,6 +17,31 @@ import { type Field, type ModuleConfig, label } from "@/lib/ui-config";
 type Row = Record<string, unknown>;
 const permissionModules = [
   "pricing",
+  "tender-submit",
+  "ticket-assign",
+  "ticket-resolve",
+  "inventory-reserve",
+  "inventory-issue",
+  "security-refund",
+  "exports",
+
+  "customer-contacts",
+  "interactions",
+  "pipeline",
+  "competitors",
+  "competitor-customers",
+  "costs",
+  "profitability",
+  "analytics",
+  "executive",
+  "search",
+  "brief",
+  "imports",
+  "accounting",
+  "ocr",
+  "adjustments",
+  "finance-adjust",
+
   "tickets",
   "ticket-visits",
   "sla-rules",
@@ -125,7 +150,7 @@ export function Relation({
         const response = await fetch(
           field.source === "employees"
             ? "/api/employees"
-            : `/api/lookups/${field.source}?for=${root.__module ?? ""}&q=${encodeURIComponent(search)}&ids=${encodeURIComponent((multiple ? ((value as string[]) ?? []) : value ? [String(value)] : []).join(","))}&manufacturerId=${encodeURIComponent(String(root.manufacturerId ?? ""))}&customerId=${encodeURIComponent(String(root.customerId ?? ""))}`,
+            : `/api/lookups/${field.source}?for=${root.__module ?? ""}&q=${encodeURIComponent(search)}&ids=${encodeURIComponent((multiple ? ((value as string[]) ?? []) : value ? [String(value)] : []).join(","))}&manufacturerId=${encodeURIComponent(String(root.manufacturerId ?? ""))}&customerId=${encodeURIComponent(String(root.customerId ?? ""))}&invoiceId=${encodeURIComponent(String(root.invoiceId ?? ""))}`,
           { signal: control.signal },
         );
         if (!response.ok) {
@@ -150,6 +175,7 @@ export function Relation({
     field.key,
     root.orderId,
     root.customerId,
+    root.invoiceId,
     root.manufacturerId,
     root.items,
     root.__module,
@@ -239,6 +265,7 @@ export function RecordForm({
 }) {
   const [values, setValues] = useState<Row>(() => initial(config, row)),
     [error, setError] = useState(""),
+    [info, setInfo] = useState(""),
     [busy, setBusy] = useState(false);
   const [draftUser, setDraftUser] = useState("");
   useEffect(() => {
@@ -259,7 +286,7 @@ export function RecordForm({
         draftKey,
         JSON.stringify({ savedAt: Date.now(), values }),
       );
-      setError(
+      setInfo(
         "Temporary draft saved in this tab. It expires after 24 hours and is cleared on sign-out.",
       );
     } catch {
@@ -692,6 +719,7 @@ export function RecordForm({
     <form onSubmit={submit}>
       <Stack spacing={2} sx={{ py: 1 }}>
         {error && <Alert severity="error">{error}</Alert>}
+        {info && <Alert severity="info">{info}</Alert>}
         {draftUser && (
           <Stack direction="row" spacing={1}>
             <Button onClick={saveDraft}>

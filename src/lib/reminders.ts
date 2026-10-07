@@ -1,7 +1,8 @@
+import { invoiceLedger } from "./revenue";
 import { refreshAmcOpportunities } from "./opportunities";
 import { canResource } from "./record-access";
 import { db } from "./db";
-import { addDays, cents } from "./business";
+import { addDays } from "./business";
 export type Reminder = {
   key: string;
   module: string;
@@ -9,6 +10,8 @@ export type Reminder = {
   title: string;
   priority: string;
   eligibleUserIds?: string[];
+  reminderAt?: Date;
+  relatedModule?: string;
 };
 export function dateReminder(
   module: string,
@@ -26,6 +29,7 @@ export function dateReminder(
     recordId: id,
     title: `${title} · ${date.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric" })}`,
     priority: remaining <= 7 ? "HIGH" : "NORMAL",
+    reminderAt: date,
   };
 }
 export async function runReminders(now = new Date()) {
@@ -159,12 +163,9 @@ export async function runReminders(now = new Date()) {
   }
   for (const i of await db.invoice.findMany({
     where: { dueDate: { lt: now } },
-    include: { payments: true },
+    include: { payments: true, adjustments: true },
   }))
-    if (
-      i.payments.reduce((s, p) => s + cents(String(p.amount)), 0n) <
-      cents(String(i.total))
-    )
+    if (invoiceLedger(i.total, i.payments, i.adjustments).outstanding > 0n)
       add(
         dateReminder(
           "invoices",
@@ -306,6 +307,7 @@ export async function runReminders(now = new Date()) {
       title: `Approval pending: ${a.title}`,
       priority: "NORMAL",
       eligibleUserIds: [a.approverId, a.createdById],
+      relatedModule: a.relatedModule,
     });
   for (const t of await db.serviceTicket.findMany({
     where: { status: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] } },
@@ -392,7 +394,11 @@ export async function runReminders(now = new Date()) {
   for (const user of users) {
     const activeKeys: string[] = [];
     for (const reminder of reminders) {
-      if (!canResource(user, reminder.module)) continue;
+      if (
+        !canResource(user, reminder.module) ||
+        (reminder.relatedModule && !canResource(user, reminder.relatedModule))
+      )
+        continue;
       if (
         user.role !== "ADMIN" &&
         reminder.eligibleUserIds &&
@@ -400,12 +406,21 @@ export async function runReminders(now = new Date()) {
       )
         continue;
       activeKeys.push(reminder.key);
-      const { eligibleUserIds: _, ...notification } = reminder;
+      const {
+        eligibleUserIds: _,
+        relatedModule: __,
+        ...notification
+      } = reminder;
       void _;
+      void __;
       await db.notification.upsert({
         where: { userId_key: { userId: user.id, key: reminder.key } },
         create: { ...notification, userId: user.id },
-        update: { title: reminder.title, priority: reminder.priority },
+        update: {
+          title: reminder.title,
+          priority: reminder.priority,
+          reminderAt: reminder.reminderAt,
+        },
       });
       count++;
     }
@@ -414,6 +429,10 @@ export async function runReminders(now = new Date()) {
       data: { dismissedAt: now },
     });
   }
+  await db.bulkImport.updateMany({
+    where: { expiresAt: { lt: now } },
+    data: { payload: [], preview: [] },
+  });
   await db.session.deleteMany({ where: { expiresAt: { lt: now } } });
   await db.auditLog.create({
     data: {

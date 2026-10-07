@@ -64,6 +64,7 @@ export async function PATCH(
           ...(data.read !== undefined
             ? { readAt: data.read ? new Date() : null }
             : {}),
+          ...(data.complete ? { completedAt: new Date() } : {}),
           ...(data.dismiss ? { dismissedAt: new Date() } : {}),
         },
       });

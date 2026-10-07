@@ -7,6 +7,12 @@ export async function GET() {
     if (!user) throw new AppError(401, "Please sign in");
     if (
       ![
+        "analytics",
+        "executive",
+        "brief",
+        "pipeline",
+        "interactions",
+        "costs",
         "visits",
         "followups",
         "tasks",
@@ -14,11 +20,11 @@ export async function GET() {
         "rfqs",
         "rfq-followups",
         "tickets",
-    "ticket-visits",
-    "amc-opportunities",
-    "consumable-opportunities",
-    "inventory",
-    "securities",
+        "ticket-visits",
+        "amc-opportunities",
+        "consumable-opportunities",
+        "inventory",
+        "securities",
         "checklist",
         "approvals",
       ].some((m) => can(user, m))

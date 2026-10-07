@@ -1,3 +1,4 @@
+import { revenueResources } from "./revenue";
 import { serviceResources } from "./service-operations";
 import { controlResources } from "./controls";
 import { schemas, type Resource } from "./schemas";
@@ -70,6 +71,7 @@ export const resources = {
   ...commercialResources,
   ...controlResources,
   ...serviceResources,
+  ...revenueResources,
   tasks: {
     model: "task",
     search: ["title", "notes"],
@@ -185,6 +187,7 @@ export const resources = {
       customer: customerSummary,
       order: orderSummary,
       payments: true,
+      adjustments: true,
       followUps: true,
       files: { select: { id: true, name: true } },
     },

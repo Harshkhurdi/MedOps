@@ -1,6 +1,13 @@
 import { authorize, can, type Actor } from "./auth";
 import { AppError } from "./errors";
-export const pricingModules = ["quotes", "comparisons", "results"];
+export const pricingModules = [
+  "quotes",
+  "comparisons",
+  "results",
+  "costs",
+  "profitability",
+  "analytics",
+];
 export function canResource(user: Actor, name: string, write = false) {
   if (
     ["approval-policies", "sla-rules", "compatibility"].includes(name) &&

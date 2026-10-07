@@ -1,8 +1,9 @@
+import { invoiceLedger } from "@/lib/revenue";
 import { api } from "@/lib/errors";
 import { authorize, can } from "@/lib/auth";
 import { recordWhere } from "@/lib/record-query";
 import { db } from "@/lib/db";
-import { addDays, cents, money, daysOverdue } from "@/lib/business";
+import { addDays, money, daysOverdue } from "@/lib/business";
 export async function GET() {
   return api(async () => {
     const user = await authorize("dashboard"),
@@ -93,7 +94,7 @@ export async function GET() {
     };
     if (can(user, "invoices")) {
       const invoices = await db.invoice.findMany({
-        include: { payments: true, customer: true },
+        include: { payments: true, adjustments: true, customer: true },
       });
       let balance = 0n,
         total = 0n,
@@ -103,12 +104,10 @@ export async function GET() {
       const byCustomer = new Map<string, bigint>();
       const expectedThisMonth: object[] = [];
       for (const i of invoices) {
-        const paid = i.payments.reduce(
-            (s, p) => s + cents(String(p.amount)),
-            0n,
-          ),
-          out = cents(String(i.total)) - paid;
-        total += cents(String(i.total));
+        const ledger = invoiceLedger(i.total, i.payments, i.adjustments),
+          paid = ledger.received,
+          out = ledger.outstanding;
+        total += ledger.charged;
         received += paid;
         balance += out;
         if (out > 0n && daysOverdue(i.dueDate, now) > 0) {

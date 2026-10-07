@@ -1,4 +1,6 @@
 "use client";
+import LookupFilter from "./lookup-filter";
+import CustomerHistory from "./customer-history";
 import EquipmentHistory from "./equipment-history";
 import ControlSummary from "./control-summary";
 import { useState, useEffect, useCallback } from "react";
@@ -41,6 +43,11 @@ const groups: Record<string, [string, string][]> = {
   ],
   customers: [
     ["customers", "Customers"],
+    ["customer-contacts", "Customer contacts"],
+    ["interactions", "Interactions"],
+    ["pipeline", "Sales pipeline"],
+    ["competitors", "Competitors"],
+    ["competitor-customers", "Competitor history"],
     ["manufacturers", "Manufacturers"],
     ["products", "Products"],
     ["manufacturer-contacts", "Manufacturer contacts"],
@@ -85,6 +92,9 @@ const groups: Record<string, [string, string][]> = {
     ["invoices", "Invoices"],
     ["payments", "Receipts"],
     ["followups", "Follow-ups"],
+    ["adjustments", "Financial corrections"],
+    ["costs", "Operational costs"],
+    ["profitability", "Profitability"],
   ],
   documents: [
     ["documents", "Document library"],
@@ -225,10 +235,14 @@ export default function Workspace({
   module,
   config,
   writable,
+  canExport = true,
+  allowedModules,
 }: {
   module: string;
   config: ModuleConfig;
   writable: boolean;
+  canExport?: boolean;
+  allowedModules?: string[];
 }) {
   const [serviceNote, setServiceNote] = useState("");
   const [gemUrl, setGemUrl] = useState(""),
@@ -239,15 +253,24 @@ export default function Workspace({
     [q, setQ] = useState(""),
     [status, setStatus] = useState(""),
     [sort, setSort] = useState("newest"),
+    [fromDate, setFromDate] = useState(""),
+    [toDate, setToDate] = useState(""),
+    [dimension, setDimension] = useState(""),
+    [dimensionValue, setDimensionValue] = useState(""),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [form, setForm] = useState<Row | null | false>(false),
     [detail, setDetail] = useState<Row | null>(null);
+  const filters = new URLSearchParams({
+    ...(fromDate ? { from: fromDate } : {}),
+    ...(toDate ? { to: toDate } : {}),
+    ...(dimension && dimensionValue ? { [dimension]: dimensionValue } : {}),
+  }).toString();
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/records/${module}?page=${page + 1}&q=${encodeURIComponent(q)}&status=${status}&sort=${sort}&parent=${typeof window !== "undefined" ? encodeURIComponent(new URLSearchParams(window.location.search).get("parent") ?? "") : ""}`,
+        `/api/records/${module}?page=${page + 1}&q=${encodeURIComponent(q)}&status=${status}&sort=${sort}&${filters}&parent=${typeof window !== "undefined" ? encodeURIComponent(new URLSearchParams(window.location.search).get("parent") ?? "") : ""}`,
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -259,7 +282,7 @@ export default function Workspace({
     } finally {
       setLoading(false);
     }
-  }, [module, page, q, status, sort]);
+  }, [module, page, q, status, sort, filters]);
   useEffect(() => {
     const timer = setTimeout(() => void load(), 200);
     return () => clearTimeout(timer);
@@ -347,11 +370,15 @@ export default function Workspace({
       });
     return () => control.abort();
   }, [module, writable]);
-  const tabs = Object.entries(groups).find(
-    ([parent, children]) =>
-      parent === module || children.some(([child]) => child === module),
-  )?.[1];
-  const statuses = config.fields.find((f) => f.key === "status")?.options;
+  const tabs = Object.entries(groups)
+    .find(
+      ([parent, children]) =>
+        parent === module || children.some(([child]) => child === module),
+    )?.[1]
+    ?.filter(([m]) => !allowedModules || allowedModules.includes(m));
+  const statuses = config.fields.find((f) =>
+    ["status", "stage", "outcome", "decision"].includes(f.key),
+  )?.options;
   const value = (row: Row, key: string) => row[key];
   async function review(record: Row, name = module) {
     const r = await fetch(`/api/review/${name}/${record.id}`, {
@@ -386,6 +413,74 @@ export default function Workspace({
             {config.createLabel ??
               (module === "company" ? "Add company profile" : "Add record")}
           </Button>
+        )}
+      </Stack>
+      <Stack direction="row" sx={{ gap: 1, flexWrap: "wrap" }}>
+        <TextField
+          size="small"
+          label="From date"
+          type="date"
+          slotProps={{ inputLabel: { shrink: true } }}
+          value={fromDate}
+          onChange={(e) => {
+            setFromDate(e.target.value);
+            setPage(0);
+          }}
+        />
+        <TextField
+          size="small"
+          label="To date"
+          type="date"
+          slotProps={{ inputLabel: { shrink: true } }}
+          value={toDate}
+          onChange={(e) => {
+            setToDate(e.target.value);
+            setPage(0);
+          }}
+        />
+        <TextField
+          size="small"
+          label="Filter by saved record"
+          select
+          value={dimension}
+          onChange={(e) => {
+            setDimension(e.target.value);
+            setDimensionValue("");
+            setPage(0);
+          }}
+          sx={{ minWidth: 190 }}
+        >
+          <MenuItem value="">All records</MenuItem>
+          {config.fields
+            .filter((f) =>
+              [
+                "customerId",
+                "manufacturerId",
+                "productId",
+                "employeeId",
+                "assignedToId",
+                "engineerId",
+              ].includes(f.key),
+            )
+            .map((f) => (
+              <MenuItem key={f.key} value={f.key}>
+                {f.label}
+              </MenuItem>
+            ))}
+        </TextField>
+        {dimension && (
+          <LookupFilter
+            source={
+              config.fields.find((f) => f.key === dimension)?.source ??
+              "employees"
+            }
+            value={dimensionValue}
+            onChange={(id) => {
+              setDimensionValue(id);
+              setPage(0);
+            }}
+            title="Choose a saved record"
+          />
         )}
       </Stack>
       {tabs && (
@@ -468,14 +563,16 @@ export default function Workspace({
       )}
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
         <Button
+          disabled={!canExport}
           variant="outlined"
-          href={`/api/export/${module}?format=xlsx&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`}
+          href={`/api/export/${module}?format=xlsx&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&${filters}`}
         >
           Export Excel
         </Button>
         <Button
+          disabled={!canExport}
           variant="outlined"
-          href={`/api/export/${module}?format=csv&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`}
+          href={`/api/export/${module}?format=csv&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&${filters}`}
         >
           Export CSV
         </Button>
@@ -768,6 +865,9 @@ export default function Workspace({
                   tenderId={String(detail.id)}
                 />
               )}
+              {module === "customers" && (
+                <CustomerHistory id={String(detail.id)} />
+              )}
               {module === "equipment" && (
                 <EquipmentHistory id={String(detail.id)} />
               )}
@@ -816,7 +916,10 @@ export default function Workspace({
               )}
               {module === "notifications" && (
                 <Stack direction="row">
-                  <Button component={Link} href={"/" + detail.module}>
+                  <Button
+                    component={Link}
+                    href={"/" + detail.module + "?record=" + detail.recordId}
+                  >
                     Open related module
                   </Button>
                   <Button
@@ -831,6 +934,19 @@ export default function Workspace({
                     }}
                   >
                     Dismiss
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      await fetch(`/api/records/notifications/${detail.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ complete: true }),
+                      });
+                      setDetail(null);
+                      void load();
+                    }}
+                  >
+                    Mark completed
                   </Button>
                 </Stack>
               )}

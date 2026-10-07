@@ -4,7 +4,8 @@ import { authorize, csrf, can } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { store, removeStored } from "@/lib/storage";
 import { generateFiles, packageFiles } from "@/lib/documents";
-import { outstanding } from "@/lib/business";
+import { money } from "@/lib/business";
+import { invoiceLedger } from "@/lib/revenue";
 const input = z
   .object({
     templateId: z.string(),
@@ -167,17 +168,18 @@ export async function POST(req: Request) {
     if (data.sourceModule === "invoices") {
       const i = await db.invoice.findUnique({
         where: { id: data.sourceId },
-        include: { customer: true, payments: true },
+        include: { customer: true, payments: true, adjustments: true },
       });
       if (!i) throw new AppError(404, "Invoice not found");
       defaults = {
         ...defaults,
         hospital_name: i.customer.name,
         invoice_number: i.number,
-        invoice_total: String(i.total),
-        outstanding_amount: outstanding(
-          String(i.total),
-          i.payments.map((p) => ({ amount: String(p.amount) })),
+        invoice_total: money(
+          invoiceLedger(i.total, i.payments, i.adjustments).charged,
+        ),
+        outstanding_amount: money(
+          invoiceLedger(i.total, i.payments, i.adjustments).outstanding,
         ),
         due_date: i.dueDate.toISOString().slice(0, 10),
       };

@@ -1,3 +1,4 @@
+import { revenueSchemas } from "./revenue";
 import { serviceSchemas } from "./service-operations";
 import { controlSchemas } from "./controls";
 import { provenance } from "./commercial";
@@ -41,6 +42,7 @@ export const orderStatuses = [
 ] as const;
 const tenderItem = z
   .object({
+    productId: optionalId,
     equipment: text,
     model: notes,
     quantity: qty,
@@ -49,6 +51,7 @@ const tenderItem = z
   .strict();
 const orderItem = z
   .object({
+    productId: optionalId,
     equipment: text,
     model: notes,
     quantity: qty,
@@ -61,6 +64,7 @@ export const schemas = {
   ...commercialSchemas,
   ...controlSchemas,
   ...serviceSchemas,
+  ...revenueSchemas,
   company: z
     .object({
       legalName: text,
@@ -88,6 +92,7 @@ export const schemas = {
     .strict(),
   customers: z
     .object({
+      ...provenance,
       name: text,
       institutionType: notes,
       address: notes,
@@ -100,6 +105,7 @@ export const schemas = {
     .strict(),
   manufacturers: z
     .object({
+      ...provenance,
       name: text,
       email: z.email().optional().nullable(),
       phone: notes,
@@ -109,6 +115,7 @@ export const schemas = {
     .strict(),
   products: z
     .object({
+      ...provenance,
       name: text,
       model: text,
       category: notes,
@@ -208,6 +215,7 @@ export const schemas = {
     .strict(),
   orders: z
     .object({
+      ...provenance,
       number: text,
       tenderId: optionalId,
       customerId: id,
@@ -288,6 +296,7 @@ export const schemas = {
     .strict(),
   amcs: z
     .object({
+      ...provenance,
       number: text,
       customerId: id,
       startDate: date,
@@ -304,6 +313,7 @@ export const schemas = {
     .strict(),
   visits: z
     .object({
+      ...provenance,
       amcId: id,
       employeeId: optionalId,
       scheduledDate: date,
@@ -317,18 +327,21 @@ export const schemas = {
     .strict(),
   invoices: z
     .object({
+      ...provenance,
       number: text,
       customerId: id,
-      orderId: id,
+      orderId: optionalId,
       invoiceDate: date,
       amount: cash,
       taxAmount: cash,
       paymentTermDays: z.coerce.number().int().min(0).max(730),
+      dueDate: optionalDate,
       notes,
     })
     .strict(),
   payments: z
     .object({
+      ...provenance,
       invoiceId: id,
       amount: cash.refine(
         (v) => Number(v) > 0,
@@ -379,7 +392,11 @@ export const schemas = {
     })
     .strict(),
   notifications: z
-    .object({ read: z.boolean().optional(), dismiss: z.boolean().optional() })
+    .object({
+      read: z.boolean().optional(),
+      dismiss: z.boolean().optional(),
+      complete: z.boolean().optional(),
+    })
     .strict(),
 };
 export type Resource = keyof typeof schemas;

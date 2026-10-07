@@ -174,6 +174,7 @@ export const commercialSchemas = {
       winner: optionalText,
       winningPrice: cash.nullable().optional(),
       competitorName: optionalText,
+      competitorId:optionalId,
       reason: optionalText,
       notes: optionalText,
       ...provenance,

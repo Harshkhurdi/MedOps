@@ -1,7 +1,7 @@
 import { authorizeResource } from "@/lib/record-access";
 import ExcelJS from "exceljs";
 import { api, AppError } from "@/lib/errors";
-import { audit } from "@/lib/auth";
+import { audit, authorize } from "@/lib/auth";
 import { collection, delegate, resources } from "@/lib/resources";
 import { recordWhere, safeRecord } from "@/lib/record-query";
 import { configs, label } from "@/lib/ui-config";
@@ -15,6 +15,7 @@ export async function GET(
     const name = collection((await ctx.params).module),
       user = await authorizeResource(name),
       params = new URL(req.url).searchParams;
+    await authorize("exports", true);
     const format = params.get("format") ?? "xlsx";
     if (!["xlsx", "csv"].includes(format))
       throw new AppError(400, "Choose Excel or CSV");
@@ -36,7 +37,15 @@ export async function GET(
         413,
         "Narrow your search; exports support up to 5,000 records",
       );
-    const columns = configs[name].columns;
+    const columns = [
+      ...new Set([
+        ...configs[name].columns,
+        "id",
+        ...configs[name].fields
+          .filter((f) => f.type === "relation" || f.type === "multi")
+          .map((f) => f.key),
+      ]),
+    ];
     const rows = records.map((row) => {
       const safe = safeRecord(name, row, user);
       return columns.map((key) =>

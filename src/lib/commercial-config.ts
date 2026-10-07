@@ -242,6 +242,7 @@ export const commercialConfigs: Record<string, ModuleConfig> = {
       f("winner", "Known winner"),
       f("winningPrice", "Known winning price (optional)", "number"),
       f("competitorName", "Competitor name"),
+      r("competitorId","Saved competitor","competitors"),
       f("reason", "Result reason", "select", false, [
         "PRICE",
         "TECHNICAL",

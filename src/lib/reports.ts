@@ -1,4 +1,5 @@
-import { cents, money, daysOverdue } from "./business";
+import { invoiceLedger, type Adjustment } from "./revenue";
+import { money, daysOverdue } from "./business";
 export type LedgerInvoice = {
   id: string;
   number: string;
@@ -6,6 +7,7 @@ export type LedgerInvoice = {
   dueDate: Date;
   customer: { id: string; name: string };
   payments: { amount: unknown }[];
+  adjustments?: Adjustment[];
 };
 export function receivables(invoices: LedgerInvoice[], now = new Date()) {
   const buckets = [
@@ -26,9 +28,8 @@ export function receivables(invoices: LedgerInvoice[], now = new Date()) {
     overdue = 0n;
   const rows = [];
   for (const invoice of invoices) {
-    const total = cents(String(invoice.total)),
-      paid = invoice.payments.reduce((s, p) => s + cents(String(p.amount)), 0n),
-      balance = total - paid;
+    const ledger = invoiceLedger(invoice.total, invoice.payments, invoice.adjustments);
+    const total = ledger.charged, paid = ledger.received, balance = ledger.outstanding;
     invoiced += total;
     received += paid;
     outstanding += balance;

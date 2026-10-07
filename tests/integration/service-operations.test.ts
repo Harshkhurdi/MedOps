@@ -34,6 +34,8 @@ beforeAll(async () => {
           { module: "tickets", read: true, write: true },
           { module: "ticket-visits", read: true, write: true },
           { module: "inventory", read: true, write: true },
+          { module: "inventory-reserve", read: true, write: true },
+          { module: "inventory-issue", read: true, write: true },
           { module: "parts", read: true, write: true },
         ],
       },
@@ -495,4 +497,90 @@ it("retires generated uncovered opportunities when actual AMC coverage is regist
       where: { equipmentId: String(e.id), status: "NOT_APPLICABLE" },
     }),
   ).toBe(1);
+});
+
+it("rejects sensitive actions when an employee has only ordinary register permissions", async () => {
+  const before = await db.inventoryTransaction.count({ where: { partId } });
+  const restricted = {
+    ...engineer,
+    permissions: engineer.permissions.filter(
+      (p) => !["inventory-reserve", "inventory-issue"].includes(p.module),
+    ),
+  };
+  for (const type of [
+    "RESERVE",
+    "RELEASE",
+    "OUT",
+    "RETURN",
+    "USED_IN_SERVICE",
+  ] as const) {
+    await expect(
+      save(
+        "inventory",
+        {
+          partId,
+          type,
+          quantity: 1,
+          transactionDate: new Date(),
+          requestId: crypto.randomUUID(),
+        },
+        restricted,
+      ),
+    ).rejects.toThrow(/action permission required/);
+  }
+  await expect(
+    save(
+      "tickets",
+      {
+        number: `DENY-RESOLVE-${suffix}`,
+        customerId,
+        issue: "Synthetic restriction",
+        productName: "Synthetic device",
+        reportedAt: new Date(),
+        status: "RESOLVED",
+      },
+      restricted,
+    ),
+  ).rejects.toThrow("ticket-resolve");
+  await expect(
+    save(
+      "tickets",
+      {
+        number: `DENY-ASSIGN-${suffix}`,
+        customerId,
+        issue: "Synthetic restriction",
+        productName: "Synthetic device",
+        reportedAt: new Date(),
+        assignedToId: admin.id,
+      },
+      restricted,
+    ),
+  ).rejects.toThrow("ticket-assign");
+  await expect(
+    save(
+      "tenders",
+      {
+        number: `DENY-SUBMIT-${suffix}`,
+        title: "Synthetic restriction",
+        status: "SUBMITTED",
+      },
+      restricted,
+    ),
+  ).rejects.toThrow("tender-submit");
+  await expect(
+    save(
+      "securities",
+      {
+        customerId,
+        type: "EMD",
+        reference: `DENY-REFUND-${suffix}`,
+        amount: "1",
+        status: "REFUNDED",
+      },
+      restricted,
+    ),
+  ).rejects.toThrow("security-refund");
+  expect(await db.inventoryTransaction.count({ where: { partId } })).toBe(
+    before,
+  );
 });
