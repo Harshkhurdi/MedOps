@@ -1,0 +1,12 @@
+ALTER TABLE "TenderItem" ADD CONSTRAINT "tender_quantity_positive" CHECK ("quantity" > 0);
+ALTER TABLE "PurchaseOrderItem" ADD CONSTRAINT "order_quantity_positive" CHECK ("quantity" > 0), ADD CONSTRAINT "order_price_nonnegative" CHECK ("unitPrice" >= 0), ADD CONSTRAINT "order_tax_range" CHECK ("taxRate" >= 0 AND "taxRate" <= 100);
+ALTER TABLE "DeliveryItem" ADD CONSTRAINT "delivery_quantity_positive" CHECK ("quantity" > 0);
+ALTER TABLE "Invoice" ADD CONSTRAINT "invoice_amounts_valid" CHECK ("amount" >= 0 AND "taxAmount" >= 0 AND "total" > 0 AND "total" = "amount" + "taxAmount"), ADD CONSTRAINT "invoice_terms_valid" CHECK ("paymentTermDays" >= 0);
+ALTER TABLE "Payment" ADD CONSTRAINT "payment_amount_positive" CHECK ("amount" > 0);
+ALTER TABLE "Warranty" ADD CONSTRAINT "warranty_dates_valid" CHECK ("durationMonths" > 0 AND "endDate" > "startDate");
+ALTER TABLE "AmcContract" ADD CONSTRAINT "amc_dates_valid" CHECK ("endDate" > "startDate" AND "amount" >= 0 AND "serviceFrequencyMonths" > 0);
+ALTER TABLE "Permission" ADD CONSTRAINT "write_requires_read" CHECK (NOT "write" OR "read");
+ALTER TABLE "StoredFile" ADD CONSTRAINT "file_size_positive" CHECK ("size" > 0);
+CREATE INDEX "Equipment_orderItemId_idx" ON "Equipment" ("orderItemId");
+CREATE INDEX "PaymentFollowUp_invoiceId_idx" ON "PaymentFollowUp" ("invoiceId");
+CREATE INDEX "Delivery_orderId_idx" ON "Delivery" ("orderId");

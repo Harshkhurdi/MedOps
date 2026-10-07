@@ -1,0 +1,598 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TenderStatus {
+  DRAFT
+  UNDER_REVIEW
+  DOCUMENTS_IN_PROGRESS
+  READY_FOR_SUBMISSION
+  SUBMITTED
+  WON
+  LOST
+  CANCELLED
+}
+
+enum OrderStatus {
+  ORDER_RECEIVED
+  MANUFACTURER_ORDER_PENDING
+  MANUFACTURER_ORDER_PLACED
+  PROCESSING
+  READY_FOR_DISPATCH
+  PARTIALLY_DELIVERED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum Compliance {
+  COMPLIES
+  DOES_NOT_COMPLY
+  REQUIRES_REVIEW
+}
+
+enum InstallationStatus {
+  PENDING
+  PARTIAL
+  INSTALLED
+  COMMISSIONED
+  ACCEPTED
+}
+
+enum WarrantyBasis {
+  DELIVERY
+  INSTALLATION
+  COMMISSIONING
+  ACCEPTANCE
+}
+
+model User {
+  id            String            @id @default(cuid())
+  email         String            @unique
+  name          String
+  passwordHash  String
+  role          Role              @default(EMPLOYEE)
+  active        Boolean           @default(true)
+  sessions      Session[]
+  permissions   Permission[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  serviceVisits ServiceVisit[]
+  followUps     PaymentFollowUp[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    String
+  read      Boolean  @default(false)
+  write     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, module])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  count       Int       @default(0)
+  lockedUntil DateTime?
+  windowStart DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model CompanyProfile {
+  id               String   @id @default(cuid())
+  legalName        String
+  address          String
+  gstin            String?
+  pan              String?
+  email            String?
+  phone            String?
+  signatory        String?
+  designation      String?
+  logoFileId       String?
+  letterheadFileId String?
+  declarations     String   @default("")
+  additionalFields Json     @default("{}")
+  reminderDays     Int      @default(30)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Customer {
+  id              String          @id @default(cuid())
+  name            String
+  institutionType String?
+  address         String?
+  state           String?
+  email           String?
+  phone           String?
+  contactName     String?
+  notes           String?
+  tenders         Tender[]
+  orders          PurchaseOrder[]
+  invoices        Invoice[]
+  equipment       Equipment[]
+  amcs            AmcContract[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Manufacturer {
+  id          String              @id @default(cuid())
+  name        String              @unique
+  email       String?
+  phone       String?
+  contactName String?
+  notes       String?
+  products    Product[]
+  tenderItems TenderItem[]
+  orderItems  PurchaseOrderItem[]
+  documents   CompanyDocument[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  name           String
+  model          String
+  category       String?
+  manufacturerId String
+  manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [id])
+  specifications String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([manufacturerId, model])
+}
+
+model CompanyDocument {
+  id             String        @id @default(cuid())
+  name           String
+  category       String
+  issueDate      DateTime?     @db.Date
+  expiryDate     DateTime?     @db.Date
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id])
+  notes          String?
+  active         Boolean       @default(true)
+  files          StoredFile[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([expiryDate])
+}
+
+model Tender {
+  id             String                @id @default(cuid())
+  number         String                @unique
+  gemUrl         String?
+  customerId     String
+  customer       Customer              @relation(fields: [customerId], references: [id])
+  category       String?
+  deadline       DateTime?
+  emd            Decimal?              @db.Decimal(18, 2)
+  estimatedValue Decimal?              @db.Decimal(18, 2)
+  warrantyTerms  String?
+  deliveryTerms  String?
+  notes          String?
+  status         TenderStatus          @default(DRAFT)
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  items          TenderItem[]
+  requirements   TenderRequirement[]
+  files          StoredFile[]
+  history        TenderStatusHistory[]
+  generated      GeneratedDocument[]
+  orders         PurchaseOrder[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([deadline, status])
+}
+
+model TenderItem {
+  id             String        @id @default(cuid())
+  tenderId       String
+  tender         Tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  equipment      String
+  model          String?
+  quantity       Int
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model TenderRequirement {
+  id            String       @id @default(cuid())
+  tenderId      String
+  tender        Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  requirement   String
+  specification String       @default("")
+  compliance    Compliance   @default(REQUIRES_REVIEW)
+  evidenceNotes String?
+  files         StoredFile[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model TenderStatusHistory {
+  id         String        @id @default(cuid())
+  tenderId   String
+  tender     Tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  fromStatus TenderStatus?
+  toStatus   TenderStatus
+  changedBy  String
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model DocumentTemplate {
+  id        String              @id @default(cuid())
+  name      String
+  kind      String
+  body      String
+  approved  Boolean             @default(false)
+  version   Int                 @default(1)
+  generated GeneratedDocument[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model GeneratedDocument {
+  id           String            @id @default(cuid())
+  tenderId     String?
+  tender       Tender?           @relation(fields: [tenderId], references: [id])
+  templateId   String?
+  template     DocumentTemplate? @relation(fields: [templateId], references: [id])
+  sourceModule String
+  sourceId     String
+  format       String
+  snapshot     Json
+  fileId       String            @unique
+  file         StoredFile        @relation(fields: [fileId], references: [id])
+  reviewedAt   DateTime?
+  reviewedBy   String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  number           String              @unique
+  tenderId         String?
+  tender           Tender?             @relation(fields: [tenderId], references: [id])
+  customerId       String
+  customer         Customer            @relation(fields: [customerId], references: [id])
+  poDate           DateTime            @db.Date
+  deliveryDeadline DateTime?           @db.Date
+  paymentTerms     String?
+  notes            String?
+  status           OrderStatus         @default(ORDER_RECEIVED)
+  confirmed        Boolean             @default(false)
+  total            Decimal             @db.Decimal(18, 2)
+  items            PurchaseOrderItem[]
+  deliveries       Delivery[]
+  equipment        Equipment[]
+  invoices         Invoice[]
+  files            StoredFile[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([deliveryDeadline, status])
+}
+
+model PurchaseOrderItem {
+  id             String         @id @default(cuid())
+  orderId        String
+  order          PurchaseOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  equipment      String
+  model          String?
+  manufacturerId String?
+  manufacturer   Manufacturer?  @relation(fields: [manufacturerId], references: [id])
+  quantity       Int
+  unitPrice      Decimal        @db.Decimal(18, 2)
+  taxRate        Decimal        @db.Decimal(5, 2)
+  deliveryItems  DeliveryItem[]
+  units          Equipment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Delivery {
+  id           String         @id @default(cuid())
+  orderId      String
+  order        PurchaseOrder  @relation(fields: [orderId], references: [id])
+  dispatchDate DateTime?      @db.Date
+  transporter  String?
+  tracking     String?
+  expectedDate DateTime?      @db.Date
+  actualDate   DateTime?      @db.Date
+  location     String
+  confirmed    Boolean        @default(false)
+  notes        String?
+  items        DeliveryItem[]
+  equipment    Equipment[]
+  files        StoredFile[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([orderId])
+}
+
+model DeliveryItem {
+  id          String            @id @default(cuid())
+  deliveryId  String
+  delivery    Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  orderItemId String
+  orderItem   PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
+  quantity    Int
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([deliveryId, orderItemId])
+}
+
+model Equipment {
+  id           String            @id @default(cuid())
+  serialNumber String            @unique
+  orderId      String
+  order        PurchaseOrder     @relation(fields: [orderId], references: [id])
+  orderItemId  String
+  orderItem    PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
+  deliveryId   String
+  delivery     Delivery          @relation(fields: [deliveryId], references: [id])
+  customerId   String
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  installation Installation?
+  warranties   Warranty[]
+  amcs         AmcEquipment[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([orderItemId])
+}
+
+model Installation {
+  id                String             @id @default(cuid())
+  equipmentId       String             @unique
+  equipment         Equipment          @relation(fields: [equipmentId], references: [id])
+  status            InstallationStatus @default(PENDING)
+  installationDate  DateTime?          @db.Date
+  commissioningDate DateTime?          @db.Date
+  acceptanceDate    DateTime?          @db.Date
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Warranty {
+  id             String            @id @default(cuid())
+  equipmentId    String
+  equipment      Equipment         @relation(fields: [equipmentId], references: [id])
+  commencement   WarrantyBasis
+  durationMonths Int
+  startDate      DateTime          @db.Date
+  endDate        DateTime          @db.Date
+  terms          String
+  notes          String?
+  files          StoredFile[]
+  history        WarrantyHistory[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([endDate])
+}
+
+model WarrantyHistory {
+  id         String   @id @default(cuid())
+  warrantyId String
+  warranty   Warranty @relation(fields: [warrantyId], references: [id])
+  snapshot   Json
+  changedBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AmcContract {
+  id                     String         @id @default(cuid())
+  number                 String         @unique
+  customerId             String
+  customer               Customer       @relation(fields: [customerId], references: [id])
+  startDate              DateTime       @db.Date
+  endDate                DateTime       @db.Date
+  amount                 Decimal        @db.Decimal(18, 2)
+  serviceFrequencyMonths Int
+  nextServiceDate        DateTime?      @db.Date
+  responsibleName        String?
+  status                 String         @default("ACTIVE")
+  notes                  String?
+  renewedFromId          String?
+  equipment              AmcEquipment[]
+  visits                 ServiceVisit[]
+  files                  StoredFile[]
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  @@index([endDate, nextServiceDate])
+}
+
+model AmcEquipment {
+  id          String      @id @default(cuid())
+  amcId       String
+  amc         AmcContract @relation(fields: [amcId], references: [id], onDelete: Cascade)
+  equipmentId String
+  equipment   Equipment   @relation(fields: [equipmentId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([amcId, equipmentId])
+}
+
+model ServiceVisit {
+  id            String       @id @default(cuid())
+  amcId         String
+  amc           AmcContract  @relation(fields: [amcId], references: [id])
+  employeeId    String?
+  employee      User?        @relation(fields: [employeeId], references: [id])
+  scheduledDate DateTime     @db.Date
+  completedDate DateTime?    @db.Date
+  status        String       @default("SCHEDULED")
+  complaint     String?
+  notes         String?
+  files         StoredFile[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Invoice {
+  id              String            @id @default(cuid())
+  number          String            @unique
+  customerId      String
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  orderId         String
+  order           PurchaseOrder     @relation(fields: [orderId], references: [id])
+  invoiceDate     DateTime          @db.Date
+  amount          Decimal           @db.Decimal(18, 2)
+  taxAmount       Decimal           @db.Decimal(18, 2)
+  total           Decimal           @db.Decimal(18, 2)
+  paymentTermDays Int
+  dueDate         DateTime          @db.Date
+  notes           String?
+  payments        Payment[]
+  followUps       PaymentFollowUp[]
+  files           StoredFile[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([dueDate])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  amount      Decimal  @db.Decimal(18, 2)
+  paymentDate DateTime @db.Date
+  reference   String
+  method      String
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([invoiceId])
+}
+
+model PaymentFollowUp {
+  id          String    @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id])
+  employeeId  String?
+  employee    User?     @relation(fields: [employeeId], references: [id])
+  contactDate DateTime  @db.Date
+  nextDate    DateTime? @db.Date
+  notes       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([nextDate])
+  @@index([invoiceId])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  module      String
+  recordId    String
+  title       String
+  priority    String
+  readAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId, readAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  module    String
+  recordId  String?
+  details   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([module, createdAt])
+}
+
+model StoredFile {
+  id                String             @id @default(cuid())
+  name              String
+  key               String             @unique
+  mime              String
+  size              Int
+  sha256            String
+  module            String
+  recordId          String
+  version           Int                @default(1)
+  companyDocumentId String?
+  companyDocument   CompanyDocument?   @relation(fields: [companyDocumentId], references: [id])
+  tenderId          String?
+  tender            Tender?            @relation(fields: [tenderId], references: [id])
+  requirementId     String?
+  requirement       TenderRequirement? @relation(fields: [requirementId], references: [id])
+  orderId           String?
+  order             PurchaseOrder?     @relation(fields: [orderId], references: [id])
+  deliveryId        String?
+  delivery          Delivery?          @relation(fields: [deliveryId], references: [id])
+  warrantyId        String?
+  warranty          Warranty?          @relation(fields: [warrantyId], references: [id])
+  amcId             String?
+  amc               AmcContract?       @relation(fields: [amcId], references: [id])
+  invoiceId         String?
+  invoice           Invoice?           @relation(fields: [invoiceId], references: [id])
+  serviceVisitId    String?
+  serviceVisit      ServiceVisit?      @relation(fields: [serviceVisitId], references: [id])
+  generated         GeneratedDocument?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([module, recordId])
+}
