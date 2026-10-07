@@ -5,7 +5,7 @@ export async function GET() {
   return api(async () => {
     const user = await currentUser();
     if (!user) throw new AppError(401, "Please sign in");
-    if (!["visits", "followups", "users"].some((m) => can(user, m)))
+    if (!["visits", "followups", "tasks", "users"].some((m) => can(user, m)))
       throw new AppError(403, "Employee directory permission required");
     return Response.json({
       rows: await db.user.findMany({

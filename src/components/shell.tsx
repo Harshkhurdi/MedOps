@@ -25,6 +25,9 @@ type SafeUser = {
 };
 const navigation = [
   ["dashboard", "Dashboard"],
+  ["tasks", "Tasks & follow-ups"],
+  ["reports", "Reports"],
+  ["ai", "AI writing assistant"],
   ["tenders", "Tenders"],
   ["generator", "Document generator"],
   ["orders", "Purchase orders"],
@@ -89,7 +92,7 @@ export default function Shell({
       </List>
       <Box sx={{ p: 3 }}>
         <Chip
-          label="AI features disabled"
+          label="Private records · optional AI"
           size="small"
           sx={{ bgcolor: "#203e47", color: "#a9cac5" }}
         />
@@ -148,7 +151,9 @@ export default function Shell({
             >
               {user.name[0]}
             </Avatar>
-            <Typography variant="body2">{user.name}</Typography>
+            <Button component={Link} href="/account" size="small">
+              {user.name}
+            </Button>
             <Button
               size="small"
               onClick={async () => {

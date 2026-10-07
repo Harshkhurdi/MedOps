@@ -55,8 +55,21 @@ export async function api(fn: () => Promise<Response>) {
 export async function json(req: Request) {
   if (!req.headers.get("content-type")?.includes("application/json"))
     throw new AppError(415, "Use application/json");
-  const text = await req.text();
-  if (text.length > 250000) throw new AppError(413, "Request is too large");
+  const reader = req.body?.getReader();
+  if (!reader) throw new AppError(400, "Request body is missing");
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > 250000) {
+      await reader.cancel();
+      throw new AppError(413, "Request is too large");
+    }
+    parts.push(value);
+  }
+  const text = Buffer.concat(parts).toString("utf8");
   try {
     return JSON.parse(text) as unknown;
   } catch {

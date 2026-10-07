@@ -6,6 +6,7 @@ export type Reminder = {
   recordId: string;
   title: string;
   priority: string;
+  eligibleUserIds?: string[];
 };
 export function dateReminder(
   module: string,
@@ -185,25 +186,61 @@ export async function runReminders(now = new Date()) {
           0,
         ),
       );
+  for (const task of await db.task.findMany({
+    where: { status: { in: ["OPEN", "IN_PROGRESS"] }, dueDate: { lte: until } },
+  })) {
+    if (!task.dueDate) continue;
+    const reminder = dateReminder(
+      "tasks",
+      task.id,
+      `Task due: ${task.title}`,
+      task.dueDate,
+      now,
+      days,
+    );
+    if (reminder)
+      reminders.push({
+        ...reminder,
+        eligibleUserIds: [
+          task.createdById,
+          ...(task.assignedToId ? [task.assignedToId] : []),
+        ],
+      });
+  }
   const users = await db.user.findMany({
     where: { active: true },
     include: { permissions: true },
   });
   let count = 0;
-  for (const user of users)
+  for (const user of users) {
+    const activeKeys: string[] = [];
     for (const reminder of reminders) {
       if (
         user.role !== "ADMIN" &&
         !user.permissions.some((p) => p.module === reminder.module && p.read)
       )
         continue;
+      if (
+        user.role !== "ADMIN" &&
+        reminder.eligibleUserIds &&
+        !reminder.eligibleUserIds.includes(user.id)
+      )
+        continue;
+      activeKeys.push(reminder.key);
+      const { eligibleUserIds: _, ...notification } = reminder;
+      void _;
       await db.notification.upsert({
         where: { userId_key: { userId: user.id, key: reminder.key } },
-        create: { ...reminder, userId: user.id },
+        create: { ...notification, userId: user.id },
         update: { title: reminder.title, priority: reminder.priority },
       });
       count++;
     }
+    await db.notification.updateMany({
+      where: { userId: user.id, key: { notIn: activeKeys }, dismissedAt: null },
+      data: { dismissedAt: now },
+    });
+  }
   await db.session.deleteMany({ where: { expiresAt: { lt: now } } });
   await db.auditLog.create({
     data: {

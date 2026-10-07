@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const valid = verifyPassword(data.password, user?.passwordHash ?? fallback);
     if (!user || !valid || !user.active)
       throw new AppError(401, "Email or password is incorrect");
-    await db.loginAttempt.delete({ where: { key } });
+    await db.loginAttempt.deleteMany({ where: { key } });
     await createSession(user.id);
     await audit(user.id, "LOGIN", "users");
     return Response.json({ name: user.name, role: user.role });

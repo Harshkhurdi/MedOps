@@ -2,6 +2,8 @@ import { beforeAll, afterAll, it, expect } from "vitest";
 import { db } from "@/lib/db";
 import { save } from "@/lib/service";
 import { hashPassword, type Actor } from "@/lib/auth";
+import { reserveAiRequest } from "@/lib/ai-config";
+import { recordWhere } from "@/lib/record-query";
 import { runReminders } from "@/lib/reminders";
 import { store, retrieve } from "@/lib/storage";
 let admin: Actor;
@@ -370,4 +372,118 @@ it("persists the complete tender, order, partial delivery, warranty, AMC and pay
       })
     ).status,
   ).toBe("DELIVERED");
+});
+
+it("protects concurrent edits, task ownership and closed-task reminders", async () => {
+  const employee = await db.user.create({
+    data: {
+      email: "task-employee@example.test",
+      name: "Synthetic task employee",
+      role: "EMPLOYEE",
+      passwordHash: hashPassword("synthetic-test-password"),
+      permissions: {
+        create: [
+          { module: "tasks", read: true, write: true },
+          { module: "notifications", read: true, write: false },
+        ],
+      },
+    },
+    include: { permissions: true },
+  });
+  const other = await db.user.create({
+    data: {
+      email: "other-task@example.test",
+      name: "Synthetic other employee",
+      passwordHash: hashPassword("synthetic-test-password"),
+    },
+    include: { permissions: true },
+  });
+  const task = await save(
+    "tasks",
+    {
+      title: "Synthetic follow-up",
+      dueDate: "2026-10-01",
+      assignedToId: employee.id,
+    },
+    admin,
+  );
+  expect(
+    await db.task.count({
+      where: await recordWhere("tasks", employee, new URLSearchParams()),
+    }),
+  ).toBe(1);
+  await expect(
+    save("tasks", { title: "Forbidden edit" }, other, String(task.id)),
+  ).rejects.toThrow("Task not found");
+  const version = (task.updatedAt as Date).toISOString();
+  const updated = await save(
+    "tasks",
+    {
+      title: "Synthetic follow-up",
+      status: "IN_PROGRESS",
+      assignedToId: employee.id,
+      dueDate: "2026-10-01",
+    },
+    employee,
+    String(task.id),
+    version,
+  );
+  await expect(
+    save(
+      "tasks",
+      { title: "Stale overwrite" },
+      admin,
+      String(task.id),
+      version,
+    ),
+  ).rejects.toThrow("changed since");
+  await runReminders(new Date("2026-10-07"));
+  expect(
+    await db.notification.count({
+      where: { userId: employee.id, module: "tasks", dismissedAt: null },
+    }),
+  ).toBe(1);
+  expect(
+    await db.notification.count({
+      where: { userId: other.id, module: "tasks" },
+    }),
+  ).toBe(0);
+  await save(
+    "tasks",
+    { title: "Synthetic follow-up", status: "DONE", assignedToId: employee.id },
+    employee,
+    String(task.id),
+    (updated.updatedAt as Date).toISOString(),
+  );
+  await runReminders(new Date("2026-10-07"));
+  expect(
+    await db.notification.count({
+      where: { userId: employee.id, module: "tasks", dismissedAt: null },
+    }),
+  ).toBe(0);
+});
+it("reserves AI allowance atomically under simultaneous requests without invoking a provider", async () => {
+  const user = await db.user.create({
+    data: {
+      email: "quota@example.test",
+      name: "Synthetic quota employee",
+      passwordHash: hashPassword("synthetic-test-password"),
+    },
+  });
+  const input = {
+    purpose: "REWRITE",
+    text: "Synthetic explicitly entered text",
+    consent: true,
+  } as const;
+  const reservations = await Promise.allSettled([
+    reserveAiRequest(user.id, input, 1),
+    reserveAiRequest(user.id, input, 1),
+  ]);
+  expect(reservations.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(await db.aiRequest.count({ where: { userId: user.id } })).toBe(1);
+  const stored = await db.aiRequest.findFirstOrThrow({
+    where: { userId: user.id },
+  });
+  expect(stored.promptHash).not.toContain(input.text);
+  expect(stored).not.toHaveProperty("text");
 });

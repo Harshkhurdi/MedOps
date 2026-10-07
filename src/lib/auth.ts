@@ -13,6 +13,9 @@ export const COOKIE =
     : "medops-session";
 export const MODULES = [
   "dashboard",
+  "tasks",
+  "reports",
+  "ai",
   "company",
   "customers",
   "manufacturers",

@@ -22,6 +22,9 @@ export default defineConfig({
       STORAGE_DRIVER: "local",
       LOCAL_STORAGE_PATH: ".local-storage/e2e",
       NEXT_TELEMETRY_DISABLED: "1",
+      OPENROUTER_API_KEY: "",
+      OPENROUTER_MODEL: "",
+      OPENROUTER_ALLOW_PROVIDER_LOGGING: "false",
     },
   },
 });

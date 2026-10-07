@@ -1,5 +1,6 @@
 import { api } from "@/lib/errors";
 import { authorize, can } from "@/lib/auth";
+import { recordWhere } from "@/lib/record-query";
 import { db } from "@/lib/db";
 import { addDays, cents, money, daysOverdue } from "@/lib/business";
 export async function GET() {
@@ -7,6 +8,19 @@ export async function GET() {
     const user = await authorize("dashboard"),
       now = new Date(),
       cards: { label: string; value: string | number; module: string }[] = [];
+    if (can(user, "tasks"))
+      cards.push({
+        label: "Open tasks",
+        value: await db.task.count({
+          where: {
+            status: { in: ["OPEN", "IN_PROGRESS"] },
+            ...(user.role !== "ADMIN"
+              ? { OR: [{ createdById: user.id }, { assignedToId: user.id }] }
+              : {}),
+          },
+        }),
+        module: "tasks",
+      });
     if (can(user, "tenders")) {
       cards.push({
         label: "Active tenders",
@@ -151,6 +165,7 @@ export async function GET() {
       };
     }
     const allowed = [
+      "tasks",
       "tenders",
       "documents",
       "orders",
@@ -161,7 +176,10 @@ export async function GET() {
       "followups",
     ].filter((m) => can(user, m));
     const deadlines = await db.notification.findMany({
-      where: { userId: user.id, module: { in: allowed }, dismissedAt: null },
+      where: {
+        ...(await recordWhere("notifications", user, new URLSearchParams())),
+        module: { in: allowed },
+      },
       take: 10,
       orderBy: { createdAt: "desc" },
     });

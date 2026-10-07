@@ -17,6 +17,9 @@ import { type Field, type ModuleConfig, label } from "@/lib/ui-config";
 type Row = Record<string, unknown>;
 const permissionModules = [
   "dashboard",
+  "tasks",
+  "reports",
+  "ai",
   "company",
   "customers",
   "manufacturers",
@@ -63,19 +66,25 @@ export function Relation({
             setOptions([]);
             return;
           }
-          const response = await fetch(`/api/records/orders/${orderId}`, {
-            signal: control.signal,
-          });
+          const response = await fetch(
+            `/api/lookups/orders?for=${root.__module ?? ""}&ids=${encodeURIComponent(String(orderId))}`,
+            {
+              signal: control.signal,
+            },
+          );
           if (response.ok) {
             const data = await response.json();
-            setOptions(data.items ?? []);
+            setOptions(data.rows?.[0]?.items ?? []);
           }
           return;
         }
         if (field.source === "files") {
-          const response = await fetch("/api/records/documents?limit=100", {
-            signal: control.signal,
-          });
+          const response = await fetch(
+            `/api/lookups/documents?for=${root.__module ?? ""}`,
+            {
+              signal: control.signal,
+            },
+          );
           if (response.ok) {
             const data = await response.json();
             setOptions(data.rows.flatMap((r: Row) => (r.files ?? []) as Row[]));
@@ -85,7 +94,7 @@ export function Relation({
         const response = await fetch(
           field.source === "employees"
             ? "/api/employees"
-            : `/api/records/${field.source}?limit=100&q=${encodeURIComponent(search)}`,
+            : `/api/lookups/${field.source}?for=${root.__module ?? ""}&q=${encodeURIComponent(search)}&ids=${encodeURIComponent((multiple ? ((value as string[]) ?? []) : value ? [String(value)] : []).join(","))}&customerId=${encodeURIComponent(String(root.customerId ?? ""))}`,
           { signal: control.signal },
         );
         if (!response.ok) {
@@ -111,10 +120,15 @@ export function Relation({
     root.orderId,
     root.customerId,
     root.items,
+    root.__module,
+    multiple,
+    value,
     search,
   ]);
   const selected = multiple
-    ? options.filter((r) => ((value as string[]) ?? []).includes(String(r.id)))
+    ? ((value as string[]) ?? []).map(
+        (id) => options.find((r) => r.id === id) ?? { id, name: id },
+      )
     : (options.find((r) => r.id === value) ??
       (value ? { id: value, name: String(value) } : null));
   return (
@@ -195,9 +209,10 @@ export function RecordForm({
   async function setField(key: string, value: unknown) {
     setValues((v) => ({ ...v, [key]: value }));
     if (module === "orders" && key === "tenderId" && value) {
-      const r = await fetch(`/api/records/tenders/${value}`);
+      const r = await fetch(`/api/lookups/tenders?for=orders&ids=${value}`);
       if (r.ok) {
-        const t = await r.json();
+        const t = (await r.json()).rows[0];
+        if (!t) return;
         setValues((v) => ({
           ...v,
           customerId: t.customerId,
@@ -219,9 +234,10 @@ export function RecordForm({
       key === "orderId" &&
       value
     ) {
-      const r = await fetch(`/api/records/orders/${value}`);
+      const r = await fetch(`/api/lookups/orders?for=${module}&ids=${value}`);
       if (r.ok) {
-        const o = await r.json();
+        const o = (await r.json()).rows[0];
+        if (!o) return;
         setValues((v) => ({
           ...v,
           customerId: o.customerId,
@@ -238,9 +254,12 @@ export function RecordForm({
       }
     }
     if (module === "equipment" && key === "deliveryId" && value) {
-      const r = await fetch(`/api/records/deliveries/${value}`);
+      const r = await fetch(
+        `/api/lookups/deliveries?for=equipment&ids=${value}`,
+      );
       if (r.ok) {
-        const d = await r.json();
+        const d = (await r.json()).rows[0];
+        if (!d) return;
         setValues((v) => ({
           ...v,
           orderId: d.orderId,
@@ -288,7 +307,10 @@ export function RecordForm({
         `/api/records/${module}${row ? "/" + row.id : ""}`,
         {
           method: row ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(row ? { "If-Match": JSON.stringify(row.updatedAt) } : {}),
+          },
           body: JSON.stringify(data),
         },
       );
@@ -313,7 +335,7 @@ export function RecordForm({
           field={f}
           value={value}
           onChange={onChange}
-          root={root}
+          root={{ ...root, __module: module }}
           multiple={f.type === "multi"}
         />
       );

@@ -23,8 +23,11 @@ test("employee screens, tender-to-payment API workflow, review and private files
     return body;
   }
   async function patch(module: string, id: string, data: unknown) {
+    const current = await (
+      await request.get(`/api/records/${module}/${id}`)
+    ).json();
     const r = await request.patch(`/api/records/${module}/${id}`, {
-      headers,
+      headers: { ...headers, "If-Match": JSON.stringify(current.updatedAt) },
       data,
     });
     const body = await r.json();

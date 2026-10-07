@@ -62,7 +62,15 @@ const groups: Record<string, [string, string][]> = {
     ["templates", "Templates"],
   ],
 };
-function FilePanel({ module, rowId }: { module: string; rowId: string }) {
+function FilePanel({
+  module,
+  rowId,
+  writable,
+}: {
+  module: string;
+  rowId: string;
+  writable: boolean;
+}) {
   const [files, setFiles] = useState<Row[]>([]),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(0),
@@ -110,7 +118,7 @@ function FilePanel({ module, rowId }: { module: string; rowId: string }) {
         PDF, DOCX, XLSX, PNG or JPEG · maximum 4 MB. A replacement retains the
         earlier version.
       </Typography>
-      <Button component="label" variant="outlined" disabled={busy}>
+      <Button component="label" variant="outlined" disabled={busy || !writable}>
         Upload document
         <input
           hidden
@@ -143,7 +151,7 @@ function FilePanel({ module, rowId }: { module: string; rowId: string }) {
               Preview
             </Button>
           )}
-          {module === "tenders" && f.mime === "application/pdf" && (
+          {module === "tenders" && writable && f.mime === "application/pdf" && (
             <Button
               onClick={async () => {
                 const r = await fetch("/api/tenders/extract", {
@@ -209,6 +217,7 @@ export default function Workspace({
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
+      setError("");
       setRows(data.rows);
       setTotal(data.total);
     } catch (e) {
@@ -226,14 +235,7 @@ export default function Workspace({
       parent === module || children.some(([child]) => child === module),
   )?.[1];
   const statuses = config.fields.find((f) => f.key === "status")?.options;
-  const value = (row: Row, key: string) =>
-    key === "outstanding"
-      ? Number(row.total) -
-        ((row.payments as Row[]) ?? []).reduce(
-          (s, p) => s + Number(p.amount),
-          0,
-        )
-      : row[key];
+  const value = (row: Row, key: string) => row[key];
   async function review(record: Row, name = module) {
     const r = await fetch(`/api/review/${name}/${record.id}`, {
       method: "POST",
@@ -330,6 +332,21 @@ export default function Workspace({
           )}
         </Paper>
       )}
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+        <Button
+          variant="outlined"
+          href={`/api/export/${module}?format=xlsx&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`}
+        >
+          Export Excel
+        </Button>
+        <Button
+          variant="outlined"
+          href={`/api/export/${module}?format=csv&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`}
+        >
+          Export CSV
+        </Button>
+        <Button onClick={() => void load()}>Refresh records</Button>
+      </Stack>
       {error && (
         <Alert severity="error" onClose={() => setError("")}>
           {error}
@@ -533,6 +550,22 @@ export default function Workspace({
               {Object.entries(detail)
                 .filter(
                   ([k, v]) =>
+                    v &&
+                    typeof v === "object" &&
+                    !Array.isArray(v) &&
+                    !["snapshot", "additionalFields"].includes(k),
+                )
+                .map(([key, v]) => (
+                  <Box key={key}>
+                    <Typography variant="caption" color="text.secondary">
+                      {key}
+                    </Typography>
+                    <Typography>{pretty(v, key)}</Typography>
+                  </Box>
+                ))}
+              {Object.entries(detail)
+                .filter(
+                  ([k, v]) =>
                     Array.isArray(v) && !["files", "permissions"].includes(k),
                 )
                 .map(([key, v]) => (
@@ -597,7 +630,11 @@ export default function Workspace({
               {config.files && (
                 <>
                   <Divider />
-                  <FilePanel module={module} rowId={String(detail.id)} />
+                  <FilePanel
+                    module={module}
+                    rowId={String(detail.id)}
+                    writable={writable}
+                  />
                 </>
               )}
               {module === "generated" && (

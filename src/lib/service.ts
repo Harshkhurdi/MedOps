@@ -21,6 +21,7 @@ export async function save(
   input: unknown,
   user: Actor,
   id?: string,
+  expectedUpdatedAt?: string,
 ) {
   const values = parseResource(name, input);
   if (["payments", "invoices", "equipment", "warranties"].includes(name) && id)
@@ -38,7 +39,38 @@ export async function save(
             })
           : null;
       if (id && !old) throw new AppError(404, "Record not found");
+      if (
+        expectedUpdatedAt &&
+        old &&
+        (old.updatedAt instanceof Date
+          ? old.updatedAt.toISOString()
+          : new Date(String(old.updatedAt)).toISOString()) !== expectedUpdatedAt
+      )
+        throw new AppError(
+          409,
+          "This record changed since you opened it. Close the form and reload before editing.",
+        );
+      if (
+        name === "tasks" &&
+        old &&
+        user.role !== "ADMIN" &&
+        old.createdById !== user.id &&
+        old.assignedToId !== user.id
+      )
+        throw new AppError(404, "Task not found");
       const data: Record<string, unknown> = { ...values };
+      if (name === "tasks") {
+        if (!id) data.createdById = user.id;
+        if (
+          data.assignedToId &&
+          !(await tx.user.findFirst({
+            where: { id: String(data.assignedToId), active: true },
+          }))
+        )
+          throw new AppError(400, "Choose an active employee");
+        data.completedAt =
+          data.status === "DONE" ? (old?.completedAt ?? new Date()) : null;
+      }
       const existingId = id;
       if (name === "users") {
         if (user.role !== "ADMIN")

@@ -1,18 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
+import AiSettings, { type AiConfiguration } from "./ai-settings";
+type Status = {
+  [key: string]: unknown;
+  ai?: AiConfiguration;
+  administrator?: boolean;
+  error?: string;
+};
 export default function Settings() {
-  const [status, setStatus] = useState<Record<string, string>>({}),
+  const [status, setStatus] = useState<Status>({}),
     [message, setMessage] = useState("");
+  function refresh() {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => setMessage("Could not load settings"));
+  }
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -74,16 +79,12 @@ export default function Settings() {
           </Stack>
         </Paper>
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="h6">AI Features</Typography>
-          <Chip label="AI Features: Disabled" color="primary" sx={{ my: 2 }} />
-          <Typography>AI Status: Disabled</Typography>
-          <Typography>AI Provider: None</Typography>
-          <Typography>External Data Processing: Disabled</Typography>
-          <Typography color="text.secondary" sx={{ mt: 2 }}>
-            Future extraction and draft assistance may be considered only with
-            administrator activation and document-level consent. Version 1
-            operates entirely without AI.
-          </Typography>
+          <AiSettings
+            key={JSON.stringify(status.ai)}
+            config={status.ai}
+            administrator={Boolean(status.administrator)}
+            onSaved={refresh}
+          />
         </Paper>
         <Paper variant="outlined" sx={{ p: 3 }}>
           <Typography variant="h6">Storage & infrastructure</Typography>
@@ -95,11 +96,13 @@ export default function Settings() {
                   "aiProvider",
                   "externalDataProcessing",
                   "error",
+                  "ai",
+                  "administrator",
                 ].includes(k),
             )
             .map(([k, v]) => (
               <Typography key={k} sx={{ mt: 1 }}>
-                {k}: {v}
+                {k}: {String(v)}
               </Typography>
             ))}
           <Typography color="text.secondary" sx={{ mt: 2 }}>

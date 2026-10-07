@@ -64,6 +64,11 @@ const invoiceSummary = {
   },
 } as const;
 export const resources = {
+  tasks: {
+    model: "task",
+    search: ["title", "notes"],
+    include: { assignee: { select: { id: true, name: true } } },
+  },
   company: { model: "companyProfile", search: ["legalName"], include: {} },
   customers: { model: "customer", search: ["name", "state"], include: {} },
   manufacturers: { model: "manufacturer", search: ["name"], include: {} },
@@ -213,7 +218,8 @@ export const resources = {
 } as const;
 export type Collection = keyof typeof resources;
 export function collection(name: string): Collection {
-  if (!(name in resources)) throw new AppError(404, "Module not found");
+  if (!Object.hasOwn(resources, name))
+    throw new AppError(404, "Module not found");
   return name as Collection;
 }
 export interface Delegate {
@@ -228,7 +234,7 @@ export function delegate(name: Collection, client: object = db) {
   return (client as Record<string, unknown>)[resources[name].model] as Delegate;
 }
 export function parseResource(name: Collection, value: unknown) {
-  if (!(name in schemas))
+  if (!Object.hasOwn(schemas, name))
     throw new AppError(405, "Use the dedicated workflow for this module");
   return schemas[name as Resource].parse(value) as Record<string, unknown>;
 }

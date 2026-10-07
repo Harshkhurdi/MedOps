@@ -13,3 +13,5 @@
 No real company records are used in tests. Production has no synthetic business seeding.
 
 Production login, dashboard, TLS database access, private Blob read/write and access denial verified on 07/10/2026. Synthetic end-to-end records remain in medops_test. Company-approved real-document acceptance and operator backup scheduling remain onboarding tasks.
+
+Enhancement release: scoped task management, receivables aging, filtered Excel/CSV exports, optimistic edit concurrency, minimal workflow lookups, self-service password changes, current notification access checks and optional OpenRouter assistance for explicitly entered text. The provider remains disabled until a valid key/model is configured; business workflows require no AI.

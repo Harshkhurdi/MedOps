@@ -493,6 +493,36 @@ export const configs: Record<string, ModuleConfig> = {
       f("permissions", "Module permissions", "permissions"),
     ],
   },
+  tasks: {
+    title: "Tasks & follow-ups",
+    description:
+      "Assign work, set deadlines and track completion. Employees see tasks they created or were assigned.",
+    columns: ["title", "assignee", "status", "priority", "dueDate"],
+    fields: [
+      f("title", "Task title", "text", true),
+      rel("assignedToId", "Assigned employee", "employees", false),
+      f("dueDate", "Due date", "date"),
+      {
+        ...f("status", "Status", "select", true, [
+          "OPEN",
+          "IN_PROGRESS",
+          "DONE",
+          "CANCELLED",
+        ]),
+        default: "OPEN",
+      },
+      {
+        ...f("priority", "Priority", "select", true, [
+          "LOW",
+          "NORMAL",
+          "HIGH",
+          "URGENT",
+        ]),
+        default: "NORMAL",
+      },
+      notes,
+    ],
+  },
   notifications: {
     title: "Notifications",
     description: "Deadlines and follow-ups assigned to you.",

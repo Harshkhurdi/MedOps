@@ -326,6 +326,18 @@ export const schemas = {
         .default([]),
     })
     .strict(),
+  tasks: z
+    .object({
+      title: text,
+      notes,
+      assignedToId: optionalId,
+      dueDate: optionalDate,
+      status: z
+        .enum(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"])
+        .default("OPEN"),
+      priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
+    })
+    .strict(),
   notifications: z
     .object({ read: z.boolean().optional(), dismiss: z.boolean().optional() })
     .strict(),
