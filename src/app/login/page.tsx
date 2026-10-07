@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -11,10 +11,14 @@ import {
   Typography,
   Chip,
 } from "@mui/material";
+const subscribe = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 export default function Login() {
   const router = useRouter();
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const ready = useSyncExternalStore(subscribe, clientReady, serverReady);
   async function login(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -61,7 +65,7 @@ export default function Login() {
           </Box>
           <Typography variant="h6">Sign in to your workspace</Typography>
           {error && <Alert severity="error">{error}</Alert>}
-          <form onSubmit={login}>
+          <form onSubmit={login} method="post" action="/api/auth/login">
             <Stack spacing={2}>
               <TextField
                 label="Email"
@@ -83,7 +87,7 @@ export default function Login() {
                 type="submit"
                 variant="contained"
                 size="large"
-                disabled={busy}
+                disabled={busy || !ready}
               >
                 {busy ? "Signing in…" : "Sign in"}
               </Button>

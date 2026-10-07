@@ -2,7 +2,7 @@
 
 Private medical equipment dealership operations: tender documentation → official purchase orders → partial deliveries and serials → installation and contractual warranties → AMC/service visits → invoices and partial receipts.
 
-**Core workflows never depend on AI.** Optional OpenRouter assistance processes only text an employee explicitly enters and approves for each request. Stored documents and business records are never attached. AI starts disabled, with no key stored in the database or browser. No company-data telemetry, third-party analytics, external conversion service, or public document storage exists. GeM Tracker is a separate application and is neither modified nor integrated.
+**Core workflows never depend on AI.** Optional OpenRouter assistance processes only text an employee explicitly enters and approves for each request. Stored documents and business records are never attached. AI starts disabled, with no key stored in the database or browser. No company-data telemetry, third-party analytics, external conversion service, or public document storage exists. Tender Tracker remains a separate application with an optional, employee-confirmed one-way tender handoff. Neither application shares a database or business document store.
 
 ## Stack and organization
 
@@ -34,7 +34,7 @@ npm run db:seed
 npm run dev
 ```
 
-`admin:create` accepts email/name/password through stdin in a private terminal; no credentials are hardcoded or passed in command arguments. Passwords must contain at least 12 characters. There is no public registration or default account. The optional seed adds only the seven specified manufacturer names, never sample tenders, customers or financial records.
+`admin:create` accepts email/name/password through stdin in a private terminal; no credentials are hardcoded or passed in command arguments. Passwords must contain at least 12 characters. There is no public registration or default account. The login form always uses POST, and Sign in stays disabled until browser handlers are ready; credentials cannot fall back to URL query parameters before hydration. The optional seed adds only the seven specified manufacturer names, never sample tenders, customers or financial records.
 
 Alternatively use Docker Compose (development):
 
