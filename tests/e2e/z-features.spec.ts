@@ -264,6 +264,17 @@ test("tasks, safe editing, reports, exports, optional AI and personal password c
       })
     ).status(),
   ).toBe(200);
+  const completedNotification = await request.patch(
+    `/api/records/notifications/${taskNotification.id}`,
+    { headers, data: { complete: true } },
+  );
+  expect(completedNotification.status()).toBe(200);
+  expect((await completedNotification.json()).completedAt).toBeTruthy();
+  expect(
+    (await (await request.get("/api/records/notifications")).json()).rows.some(
+      (n: { id: string }) => n.id === taskNotification.id,
+    ),
+  ).toBe(false);
   await page.goto("/account");
   await page.getByLabel(/^Current password/).fill("synthetic-test-password");
   await page.getByLabel(/^New password/).fill("synthetic-new-password");

@@ -328,3 +328,63 @@ it("rejects an invoice dated before its actual linked purchase order", async () 
     await db.invoice.count({ where: { number: `DATE-INVOICE-${suffix}` } }),
   ).toBe(0);
 });
+
+it("persists actual competitor/customer/result links without inventing unknown prices", async () => {
+  const competitor = await save(
+    "competitors",
+    {
+      company: `Synthetic competitor ${suffix}`,
+      brands: "Known test brand",
+      categories: "Imaging",
+    },
+    admin,
+  );
+  const link = await save(
+    "competitor-customers",
+    { competitorId: competitor.id, customerId, category: "Imaging" },
+    admin,
+  );
+  expect(link.competitorId).toBe(competitor.id);
+  const tender = await save(
+    "tenders",
+    { number: `Competitor tender ${suffix}`, customerId },
+    admin,
+  );
+  const result = await save(
+    "results",
+    {
+      tenderId: tender.id,
+      outcome: "LOST",
+      competitorId: competitor.id,
+      resultDate: "2026-10-07",
+      historical: true,
+      reason: "Actual synthetic acceptance loss",
+    },
+    admin,
+  );
+  expect(result.competitorId).toBe(competitor.id);
+  expect(result.winningPrice).toBeNull();
+  expect(
+    (await db.tender.findUniqueOrThrow({ where: { id: String(tender.id) } }))
+      .status,
+  ).toBe("LOST");
+  await expect(
+    save("competitors", { company: `Synthetic competitor ${suffix}` }, admin),
+  ).rejects.toThrow();
+  await expect(
+    save(
+      "competitor-customers",
+      { competitorId: "missing-competitor", customerId },
+      admin,
+    ),
+  ).rejects.toThrow();
+  expect(
+    await db.auditLog.count({
+      where: {
+        module: "competitors",
+        recordId: String(competitor.id),
+        action: "CREATE",
+      },
+    }),
+  ).toBe(1);
+});

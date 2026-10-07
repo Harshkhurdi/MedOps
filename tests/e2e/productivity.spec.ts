@@ -13,15 +13,13 @@ test("reviewed CSV import, financial correction UI and authorization for product
     request = page.request;
   await page.goto("/imports");
   const name = `Browser import hospital ${suffix}`;
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "synthetic-customers.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        `name,originalDate\n${name},2010-01-01\n${name},2010-01-01`,
-      ),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "synthetic-customers.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      `name,originalDate\n${name},2010-01-01\n${name},2010-01-01`,
+    ),
+  });
   await expect(
     page.getByText(
       "2 rows loaded. Map required fields; relation fields use saved record IDs.",
@@ -112,6 +110,9 @@ test("reviewed CSV import, financial correction UI and authorization for product
     "/api/search?q=Hospital",
     "/api/brief",
     "/api/management?view=analytics",
+    "/api/management?view=profitability",
+    "/api/records/competitors",
+    "/api/export/costs?format=csv",
     "/api/accounting",
     "/api/ocr",
     `/api/customers/${customer.id}/timeline`,
