@@ -34,7 +34,7 @@ All business workflows remain manual and database-backed. Optional providers do 
 - Immutable original invoices/payments plus confirmed, reasoned credit/debit notes and partial payment reversals. Corrections cannot create negative base/tax balances, overpayments or exceed original receipts/order caps.
 - Corrected receivables in invoice details, dashboard, aging, reminders, document generation and accounting interchange.
 - Manually entered actual operational costs by customer, manufacturer, product, tender, order, delivery, installation or ticket; service/post-sale flags.
-- Operational contribution by order/customer/manufacturer/product/category/month. Revenue excludes invoice tax; enter recoverable-tax-exclusive costs for a comparable margin. Mixed or missing product/manufacturer links remain unallocated. This does not replace statutory accounting.
+- Operational contribution by order/customer/manufacturer/product/category/month. Entity groups use saved IDs, so separate customers/products sharing a name retain separate totals. Contribution and margin require permission to both cost and invoice sources. Revenue excludes invoice tax; enter recoverable-tax-exclusive costs for a comparable margin. Mixed or missing product/manufacturer links remain unallocated. This does not replace statutory accounting.
 - Manufacturer/product/customer performance from saved links. Product identity can be linked on tender/order items and carried into equipment. No fuzzy guesses or invented allocations. Historic lines without product IDs remain unallocated until a permitted manual correction is possible.
 
 ## Productivity, reporting and privacy

@@ -388,3 +388,152 @@ it("persists actual competitor/customer/result links without inventing unknown p
     }),
   ).toBe(1);
 });
+
+it("keeps contribution and product metrics separate for saved records sharing the same name", async () => {
+  const name = `Same-name acceptance ${suffix}`;
+  const expected = [];
+  for (const [index, revenue, cost] of [
+    [1, "10", "4"],
+    [2, "20", "18"],
+  ] as const) {
+    const customer = await save(
+      "customers",
+      { name, address: `Synthetic separate hospital ${index}` },
+      admin,
+    );
+    const manufacturer = await save(
+      "manufacturers",
+      { name: `Same-name brand ${suffix}-${index}` },
+      admin,
+    );
+    const product = await save(
+      "products",
+      { name, model: `Model ${index}`, manufacturerId: manufacturer.id },
+      admin,
+    );
+    const order = await save(
+      "orders",
+      {
+        number: `Identity-order-${suffix}-${index}`,
+        customerId: customer.id,
+        poDate: "2020-01-01",
+        confirmed: true,
+        historical: true,
+        items: [
+          {
+            equipment: name,
+            productId: product.id,
+            quantity: 1,
+            unitPrice: revenue,
+            taxRate: "0",
+          },
+        ],
+      },
+      admin,
+    );
+    await save(
+      "invoices",
+      {
+        number: `Identity-invoice-${suffix}-${index}`,
+        orderId: order.id,
+        customerId: customer.id,
+        invoiceDate: "2020-01-02",
+        amount: revenue,
+        taxAmount: "0",
+        paymentTermDays: 30,
+        historical: true,
+      },
+      admin,
+    );
+    await save(
+      "costs",
+      {
+        title: "Actual synthetic purchase cost",
+        category: "MANUFACTURER_PURCHASE",
+        customerId: customer.id,
+        orderId: order.id,
+        productId: product.id,
+        amount: cost,
+        incurredDate: "2020-01-01",
+      },
+      admin,
+    );
+    expected.push({
+      customerId: customer.id,
+      productId: product.id,
+      revenue,
+      cost,
+      margin: index === 1 ? "60.0000" : "10.0000",
+    });
+  }
+  const restrictedReport = await managementReport(
+    {
+      ...admin,
+      role: "EMPLOYEE",
+      permissions: [
+        "analytics",
+        "pricing",
+        "products",
+        "manufacturers",
+        "costs",
+      ].map((module) => ({
+        id: module,
+        userId: admin.id,
+        module,
+        read: true,
+        write: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    },
+    new URLSearchParams(),
+  );
+  expect(restrictedReport.profitability).toBeNull();
+  expect(
+    restrictedReport.productMetrics.every(
+      (p) =>
+        p.operationalRevenue === null &&
+        p.recordedContribution === null &&
+        p.operationalMargin === null,
+    ),
+  ).toBe(true);
+  const report = await managementReport(admin, new URLSearchParams());
+  expect(
+    report.profitability?.groups.filter(
+      (g) => g.dimension === "customer" && g.key === name,
+    ),
+  ).toHaveLength(2);
+  expect(
+    report.profitability?.groups.filter(
+      (g) => g.dimension === "product" && g.key === name,
+    ),
+  ).toHaveLength(2);
+  for (const e of expected) {
+    for (const [dimension, id] of [
+      ["customer", e.customerId],
+      ["product", e.productId],
+    ] as const)
+      expect(
+        report.profitability?.groups.find(
+          (g) => g.dimension === dimension && g.recordId === id,
+        ),
+      ).toMatchObject({
+        revenue: e.revenue + ".00",
+        recordedCosts: e.cost + ".00",
+        contributionMarginPercent: e.margin,
+      });
+    const product = await db.product.findUniqueOrThrow({
+      where: { id: String(e.productId) },
+    });
+    expect(
+      report.productMetrics.find(
+        (p) =>
+          p.model === product.model &&
+          p.manufacturerId === product.manufacturerId,
+      ),
+    ).toMatchObject({
+      operationalRevenue: e.revenue + ".00",
+      operationalMargin: e.margin,
+    });
+  }
+});

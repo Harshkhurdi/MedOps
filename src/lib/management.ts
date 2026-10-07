@@ -119,45 +119,70 @@ export async function managementReport(
     {
       dimension: string;
       key: string;
+      recordId: string | null;
       revenue: bigint;
       costs: bigint;
       service: bigint;
       postSale: bigint;
     }
   >();
-  const group = (dimension: string, key: string) => {
-    const token = dimension + ":" + key;
+  const group = (dimension: string, key: string, recordId: string | null) => {
+    const token = JSON.stringify([
+      dimension,
+      recordId === null ? "label" : "id",
+      recordId ?? key,
+    ]);
     let r = groups.get(token);
     if (!r) {
-      r = { dimension, key, revenue: 0n, costs: 0n, service: 0n, postSale: 0n };
+      r = {
+        dimension,
+        key,
+        recordId,
+        revenue: 0n,
+        costs: 0n,
+        service: 0n,
+        postSale: 0n,
+      };
       groups.set(token, r);
     }
     return r;
   };
-  for (const r of revenues)
-    for (const [d, k] of [
-      ["order", r.invoice.order?.number ?? "Unlinked historical invoices"],
-      ["customer", r.invoice.customer.name],
-      ["manufacturer", r.manufacturer?.name ?? "Unallocated"],
-      ["product", r.product?.name ?? "Unallocated"],
-      ["category", "Recorded revenue"],
-      ["period", r.invoice.invoiceDate.toISOString().slice(0, 7)],
-    ])
-      group(d, k).revenue += r.net;
-  for (const c of costs)
-    for (const [d, k] of [
-      ["order", c.order?.number ?? "Unlinked costs"],
-      ["customer", c.customer.name],
-      ["manufacturer", c.manufacturer?.name ?? "Unallocated"],
-      ["product", c.product?.name ?? "Unallocated"],
-      ["category", c.category],
-      ["period", c.incurredDate.toISOString().slice(0, 7)],
-    ]) {
-      const g = group(d, k);
+  for (const r of revenues) {
+    const dimensions: [string, string, string | null][] = [
+      [
+        "order",
+        r.invoice.order?.number ?? "Unlinked historical invoices",
+        r.invoice.orderId,
+      ],
+      ["customer", r.invoice.customer.name, r.invoice.customerId],
+      [
+        "manufacturer",
+        r.manufacturer?.name ?? "Unallocated",
+        r.manufacturer?.id ?? null,
+      ],
+      ["product", r.product?.name ?? "Unallocated", r.product?.id ?? null],
+      ["category", "Recorded revenue", null],
+      ["period", r.invoice.invoiceDate.toISOString().slice(0, 7), null],
+    ];
+    for (const [dimension, key, id] of dimensions)
+      group(dimension, key, id).revenue += r.net;
+  }
+  for (const c of costs) {
+    const dimensions: [string, string, string | null][] = [
+      ["order", c.order?.number ?? "Unlinked costs", c.orderId],
+      ["customer", c.customer.name, c.customerId],
+      ["manufacturer", c.manufacturer?.name ?? "Unallocated", c.manufacturerId],
+      ["product", c.product?.name ?? "Unallocated", c.productId],
+      ["category", c.category, null],
+      ["period", c.incurredDate.toISOString().slice(0, 7), null],
+    ];
+    for (const [dimension, key, id] of dimensions) {
+      const g = group(dimension, key, id);
       g.costs += cents(String(c.amount));
       if (c.serviceCost) g.service += cents(String(c.amount));
       if (c.postSale) g.postSale += cents(String(c.amount));
     }
+  }
   const profitability = {
     ...operationalContribution(
       revenues.reduce((s, r) => s + r.net, 0n),
@@ -176,6 +201,7 @@ export async function managementReport(
     groups: [...groups.values()].map((g) => ({
       dimension: g.dimension,
       key: g.key,
+      recordId: g.recordId,
       ...operationalContribution(g.revenue, g.costs),
       serviceCost: money(g.service),
       postSaleCost: money(g.postSale),
@@ -497,7 +523,7 @@ export async function managementReport(
         q.quotationDate >= q.series.rfq.sentAt!,
     );
     const profit = profitability.groups.find(
-      (g) => g.dimension === "manufacturer" && g.key === m.name,
+      (g) => g.dimension === "manufacturer" && g.recordId === m.id,
     );
     return {
       manufacturer: m.name,
@@ -675,7 +701,7 @@ export async function managementReport(
         o.items.filter((i) => i.productId === p.id),
       ),
       profit = profitability.groups.find(
-        (g) => g.dimension === "product" && g.key === p.name,
+        (g) => g.dimension === "product" && g.recordId === p.id,
       );
     return {
       product: p.name,
@@ -708,13 +734,18 @@ export async function managementReport(
   });
   const protectMetrics = (
     rows: Record<string, unknown>[],
-    mapping: Record<string, string>,
+    mapping: Record<string, string | string[]>,
   ) =>
     rows.map((row) =>
       Object.fromEntries(
         Object.entries(row).map(([key, value]) => [
           key,
-          mapping[key] && !canResource(user, mapping[key]) ? null : value,
+          mapping[key] &&
+          !(Array.isArray(mapping[key]) ? mapping[key] : [mapping[key]]).every(
+            (module) => canResource(user, module),
+          )
+            ? null
+            : value,
         ]),
       ),
     );
@@ -731,8 +762,8 @@ export async function managementReport(
       serviceTickets: "tickets",
       amcOpportunities: "amc-opportunities",
       operationalRevenue: "invoices",
-      recordedContribution: "costs",
-      operationalMargin: "costs",
+      recordedContribution: ["costs", "invoices"],
+      operationalMargin: ["costs", "invoices"],
     }),
     profitability:
       canResource(user, "costs") && canResource(user, "invoices")
@@ -758,7 +789,7 @@ export async function managementReport(
       losses: "tenders",
       orderValue: "orders",
       operationalRevenue: "invoices",
-      recordedContribution: "costs",
+      recordedContribution: ["costs", "invoices"],
       openRfqs: "rfqs",
       quoteResponseDays: "quotes",
       installedUnits: "equipment",
