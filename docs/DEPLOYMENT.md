@@ -1,0 +1,14 @@
+# Controlled Vercel deployment
+
+1. Run typecheck, lint, unit/document tests, isolated PostgreSQL integration, browser E2E, schema validation, migration replay/diff and the production build. Fix failures.
+2. Review tracked files for secrets and company documents. Commit meaningful changes and push normally to `Harshkhurdi/MedOps` main. Fetch before subsequent pushes; never force-push or discard remote changes.
+3. Use the existing authorized Vercel team. Create/link **medops** and connect only the MedOps repository. The separate GeM Tracker project/repository/database/storage must not be touched.
+4. Provision a separate managed PostgreSQL resource, with direct and pooled TLS URLs. Provision **private** Vercel Blob. Connect resources to production; use different resources for preview/development if business data may be exposed there.
+5. Set DATABASE_URL, DIRECT_URL, STORAGE_DRIVER=blob, BLOB_READ_WRITE_TOKEN, APP_URL, CRON_SECRET and telemetry/update-check settings in Vercel. Secrets are server-only and never NEXT_PUBLIC variables. Pull to an ignored, permission-600 file only if a trusted local release needs migrations.
+6. Back up an existing production database before migrating. Use the direct URL with `prisma migrate deploy`. Never use `migrate reset`, `db push --accept-data-loss` or test seed/truncate commands against production. Migrations are additive in this release. Validate migration status.
+7. Bootstrap the named real administrator using `admin:create` in a private trusted shell with the production connection. Initial generated credentials must be delivered through a private local secret file, excluded from Git. Replace the initial password in User accounts and sign in again.
+8. Deploy to production. Set APP_URL to the verified stable production alias. Connect main as the production branch. Vercel's successful immutable deployments advance the production alias; a failed build does not replace the previous successful deployment. Do not auto-run schema-changing development migrations during builds.
+9. Verify HTTPS/login/dashboard, authenticated settings/database checks, private storage access and denied public routes. Exercise business workflows with company-approved records/documents only. Do not create fictional production tenders/orders/invoices to demonstrate features; the full synthetic workflow belongs in medops_test.
+10. Confirm scheduled reminders with a manual authenticated check and Cron configuration. Verify audit history, storage privacy and absence of external LLM/analytics requests. Record URL, commit, migration state and test limitations.
+
+Rollback code by promoting a previous verified deployment or reverting a commit normally; never force-push main. Database migrations are independent of code rollback. Restore database/object backups only under a planned maintenance procedure with verified inventory/checksums.
