@@ -17,3 +17,5 @@ src/generated/
 .agents/
 .claude/
 skills-lock.json
+
+next-env.d.ts

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import path from "node:path";
 import { api, json, AppError } from "@/lib/errors";
 import { authorize, csrf, audit } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -14,12 +15,20 @@ export async function POST(req: Request) {
     const file = await db.storedFile.findUnique({ where: { id: fileId } });
     if (!file || file.module !== "tenders" || file.mime !== "application/pdf")
       throw new AppError(400, "Choose a tender PDF");
-    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const { getDocument, GlobalWorkerOptions } =
+      await import("pdfjs-dist/legacy/build/pdf.mjs");
+    GlobalWorkerOptions.workerSrc = path.join(
+      process.cwd(),
+      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    );
     const bytes = await retrieve(file.key);
     const task = getDocument({
       data: new Uint8Array(bytes),
       useSystemFonts: false,
       disableFontFace: true,
+      standardFontDataUrl:
+        path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/") +
+        path.sep,
     });
     try {
       const pdf = await task.promise;
