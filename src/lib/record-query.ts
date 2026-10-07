@@ -1,3 +1,4 @@
+import { canResource } from "./record-access";
 import { type Actor, can } from "./auth";
 import { resources, type Collection } from "./resources";
 import { db } from "./db";
@@ -15,6 +16,10 @@ export async function recordWhere(
     where.OR = resources[name].search.map((field) => ({
       [field]: { contains: q, mode: "insensitive" },
     }));
+  if (["approvals", "mail"].includes(name) && user.role !== "ADMIN")
+    where.relatedModule = {
+      in: Object.keys(resources).filter((m) => canResource(user, m)),
+    };
   if (name === "notifications") {
     where.userId = user.id;
     where.dismissedAt = null;
@@ -57,6 +62,9 @@ export async function recordWhere(
     where.status = status;
   }
   const parentFields: Record<string, string> = {
+    checklist: "tenderId",
+    securities: "tenderId",
+    "rfq-followups": "rfqId",
     requirements: "tenderId",
     generated: "tenderId",
     deliveries: "orderId",

@@ -1,3 +1,4 @@
+import { controlResources } from "./controls";
 import { schemas, type Resource } from "./schemas";
 import { commercialResources } from "./commercial";
 import { db } from "./db";
@@ -66,6 +67,7 @@ const invoiceSummary = {
 } as const;
 export const resources = {
   ...commercialResources,
+  ...controlResources,
   tasks: {
     model: "task",
     search: ["title", "notes"],

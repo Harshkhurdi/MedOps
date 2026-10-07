@@ -1,3 +1,4 @@
+import { controlSchemas } from "./controls";
 import { commercialSchemas } from "./commercial";
 import { z } from "zod";
 const text = z.string().trim().min(1).max(500);
@@ -56,6 +57,7 @@ const orderItem = z
   .strict();
 export const schemas = {
   ...commercialSchemas,
+  ...controlSchemas,
   company: z
     .object({
       legalName: text,

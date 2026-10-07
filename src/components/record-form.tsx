@@ -17,6 +17,13 @@ import { type Field, type ModuleConfig, label } from "@/lib/ui-config";
 type Row = Record<string, unknown>;
 const permissionModules = [
   "pricing",
+  "securities",
+  "checklist",
+  "approvals",
+  "approval-policies",
+  "approval-decide",
+  "communication",
+  "mail",
   "decisions",
   "manufacturer-contacts",
   "rfqs",

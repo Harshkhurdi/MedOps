@@ -55,6 +55,32 @@ export default function CommercialActions({
       {error && <Alert severity="error">{error}</Alert>}
       {module === "tenders" && writable && (
         <>
+          <Button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              try {
+                const r = await fetch("/api/controls/checklist", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ tenderId: row.id }),
+                });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.error);
+                onChanged();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Add standard bid checklist
+          </Button>
+          <Button component={Link} href={`/checklist?parent=${row.id}`}>
+            Open bid checklist
+          </Button>
           <TextField
             label="Commercial decision reason"
             value={reason}

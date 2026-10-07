@@ -13,6 +13,13 @@ export const COOKIE =
     : "medops-session";
 export const MODULES = [
   "pricing",
+  "securities",
+  "checklist",
+  "approvals",
+  "approval-policies",
+  "approval-decide",
+  "communication",
+  "mail",
   "decisions",
   "manufacturer-contacts",
   "rfqs",

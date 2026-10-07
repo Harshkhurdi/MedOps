@@ -1,3 +1,4 @@
+import { controlConfigs } from "./controls";
 import { commercialConfigs, historicalFields } from "./commercial-config";
 export type Field = {
   key: string;
@@ -56,6 +57,7 @@ const orderItems: Field[] = [
 ];
 export const configs: Record<string, ModuleConfig> = {
   ...commercialConfigs,
+  ...controlConfigs,
   company: {
     title: "Company profile",
     description:

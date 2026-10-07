@@ -1,3 +1,4 @@
+import { assertLinkedAccess } from "@/lib/linked-access";
 import { authorizeResource } from "@/lib/record-access";
 import { api, AppError, json } from "@/lib/errors";
 import { csrf, audit, can } from "@/lib/auth";
@@ -20,6 +21,7 @@ export async function GET(
     });
     if (!row || (name === "notifications" && row.userId !== user.id))
       throw new AppError(404, "Record not found");
+    assertLinkedAccess(name, user, row);
     if (name === "notifications") await assertNotificationScope(user, row);
     if (name === "generated" && !can(user, String(row.sourceModule)))
       throw new AppError(

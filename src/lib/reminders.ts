@@ -1,3 +1,4 @@
+import { canResource } from "./record-access";
 import { db } from "./db";
 import { addDays, cents } from "./business";
 export type Reminder = {
@@ -207,6 +208,103 @@ export async function runReminders(now = new Date()) {
         ],
       });
   }
+  for (const r of await db.rfq.findMany({
+    where: {
+      status: { notIn: ["CLOSED", "CANCELLED", "FINAL_QUOTE_RECEIVED"] },
+    },
+  }))
+    if (r.quoteRequiredBy)
+      add(
+        dateReminder(
+          "rfqs",
+          r.id,
+          `RFQ response due: ${r.number}`,
+          r.quoteRequiredBy,
+          now,
+          days,
+        ),
+      );
+  for (const f of await db.rfqFollowUp.findMany({
+    where: { nextDate: { lte: until } },
+    include: { rfq: true },
+  }))
+    if (f.nextDate && !["CLOSED", "CANCELLED"].includes(f.rfq.status))
+      add(
+        dateReminder(
+          "rfq-followups",
+          f.id,
+          `RFQ follow-up: ${f.rfq.number}`,
+          f.nextDate,
+          now,
+          days,
+        ),
+      );
+  for (const series of await db.quoteSeries.findMany({
+    include: { revisions: { orderBy: { revision: "desc" }, take: 1 } },
+  })) {
+    const q = series.revisions[0];
+    if (q?.validityDate)
+      add(
+        dateReminder(
+          "quotes",
+          q.id,
+          `Quotation validity: ${q.number} revision ${q.revision}`,
+          q.validityDate,
+          now,
+          days,
+        ),
+      );
+  }
+  for (const s of await db.security.findMany({
+    where: {
+      status: { notIn: ["REFUNDED", "RELEASED", "INVOKED", "CANCELLED"] },
+    },
+  })) {
+    if (s.validityDate)
+      add(
+        dateReminder(
+          "securities",
+          s.id,
+          `Security validity: ${s.reference}`,
+          s.validityDate,
+          now,
+          90,
+        ),
+      );
+    if (s.claimExpiry)
+      add(
+        dateReminder(
+          "securities",
+          s.id,
+          `Security claim expiry: ${s.reference}`,
+          s.claimExpiry,
+          now,
+          days,
+        ),
+      );
+    if (s.expectedRefundDate)
+      add(
+        dateReminder(
+          "securities",
+          s.id,
+          `Security refund due: ${s.reference}`,
+          s.expectedRefundDate,
+          now,
+          days,
+        ),
+      );
+  }
+  for (const a of await db.approval.findMany({
+    where: { status: "SUBMITTED" },
+  }))
+    reminders.push({
+      key: `approval:${a.id}:${a.submittedAt?.toISOString()}`,
+      module: "approvals",
+      recordId: a.id,
+      title: `Approval pending: ${a.title}`,
+      priority: "NORMAL",
+      eligibleUserIds: [a.approverId, a.createdById],
+    });
   const users = await db.user.findMany({
     where: { active: true },
     include: { permissions: true },
@@ -215,11 +313,7 @@ export async function runReminders(now = new Date()) {
   for (const user of users) {
     const activeKeys: string[] = [];
     for (const reminder of reminders) {
-      if (
-        user.role !== "ADMIN" &&
-        !user.permissions.some((p) => p.module === reminder.module && p.read)
-      )
-        continue;
+      if (!canResource(user, reminder.module)) continue;
       if (
         user.role !== "ADMIN" &&
         reminder.eligibleUserIds &&

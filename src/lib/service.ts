@@ -1,3 +1,5 @@
+import { prepareControls } from "./controls-service";
+import { controlResources } from "./controls";
 import { prepareCommercial } from "./commercial-service";
 import { commercialResources } from "./commercial";
 import { db } from "./db";
@@ -65,6 +67,8 @@ export async function save(
         throw new AppError(403, "Historical entry requires an administrator");
       if (Object.hasOwn(commercialResources, name))
         await prepareCommercial(tx, name, data, user, old, id);
+      if (Object.hasOwn(controlResources, name))
+        await prepareControls(tx, name, data, user, old);
       if (name === "tasks") {
         if (!id) data.createdById = user.id;
         if (

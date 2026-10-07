@@ -1,4 +1,5 @@
 "use client";
+import ControlSummary from "./control-summary";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -48,6 +49,10 @@ const groups: Record<string, [string, string][]> = {
     ["requirements", "Technical compliance"],
     ["decisions", "Go / No-Go"],
     ["results", "Win / Loss"],
+    ["checklist", "Bid checklist"],
+    ["securities", "Securities"],
+    ["approvals", "Approvals"],
+    ["approval-policies", "Approval policies"],
   ],
   deliveries: [
     ["deliveries", "Dispatch & delivery"],
@@ -224,7 +229,7 @@ export default function Workspace({
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/records/${module}?page=${page + 1}&q=${encodeURIComponent(q)}&status=${status}&sort=${sort}`,
+        `/api/records/${module}?page=${page + 1}&q=${encodeURIComponent(q)}&status=${status}&sort=${sort}&parent=${typeof window !== "undefined" ? encodeURIComponent(new URLSearchParams(window.location.search).get("parent") ?? "") : ""}`,
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
@@ -343,6 +348,7 @@ export default function Workspace({
           ))}
         </Stack>
       )}
+      {module === "securities" && <ControlSummary module="securities" />}
       {module === "tenders" && (
         <Alert severity="info">
           GeM metadata and PDF text can assist manual entry. Portal restrictions
@@ -685,6 +691,12 @@ export default function Workspace({
                     Add service note to history
                   </Button>
                 </Stack>
+              )}
+              {module === "tenders" && detail && (
+                <ControlSummary
+                  module="checklist"
+                  tenderId={String(detail.id)}
+                />
               )}
               <CommercialActions
                 module={module}

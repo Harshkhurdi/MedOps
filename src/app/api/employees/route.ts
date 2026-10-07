@@ -6,9 +6,17 @@ export async function GET() {
     const user = await currentUser();
     if (!user) throw new AppError(401, "Please sign in");
     if (
-      !["visits", "followups", "tasks", "users", "rfqs", "rfq-followups"].some(
-        (m) => can(user, m),
-      )
+      ![
+        "visits",
+        "followups",
+        "tasks",
+        "users",
+        "rfqs",
+        "rfq-followups",
+        "securities",
+        "checklist",
+        "approvals",
+      ].some((m) => can(user, m))
     )
       throw new AppError(403, "Employee directory permission required");
     return Response.json({

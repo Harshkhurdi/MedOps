@@ -132,6 +132,7 @@ model CompanyProfile {
 }
 
 model Customer {
+  securities      Security[]
   id              String          @id @default(cuid())
   name            String
   institutionType String?
@@ -152,8 +153,8 @@ model Customer {
 }
 
 model Manufacturer {
-  id          String              @id @default(cuid())
-  name        String              @unique
+  id          String                @id @default(cuid())
+  name        String                @unique
   email       String?
   phone       String?
   contactName String?
@@ -165,22 +166,22 @@ model Manufacturer {
   tenderItems TenderItem[]
   orderItems  PurchaseOrderItem[]
   documents   CompanyDocument[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 }
 
 model Product {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   name           String
   model          String
   category       String?
   manufacturerId String
-  manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [id])
+  manufacturer   Manufacturer  @relation(fields: [manufacturerId], references: [id])
   rfqs           Rfq[]
   quoteSeries    QuoteSeries[]
   specifications String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@unique([manufacturerId, model])
 }
@@ -203,43 +204,45 @@ model CompanyDocument {
 }
 
 model Tender {
-  id             String                @id @default(cuid())
-  number         String                @unique
-  gemUrl         String?
-  customerId     String?
-  customer       Customer?             @relation(fields: [customerId], references: [id])
-  category       String?
-  deadline       DateTime?
-  emd            Decimal?              @db.Decimal(18, 2)
-  estimatedValue Decimal?              @db.Decimal(18, 2)
-  warrantyTerms  String?
-  deliveryTerms  String?
-  notes          String?
-  status         TenderStatus          @default(DRAFT)
-  reviewedAt     DateTime?
-  reviewedBy     String?
-  bidNumber      String?
-  title          String?
-  state          String?
-  source         String?
-  sourceUrl      String?
-  publicationDate DateTime? @db.Date
-  historical     Boolean @default(false)
-  originalDate   DateTime? @db.Date
-  recordSource   String @default("MANUAL")
-  decisions      TenderDecision[]
-  rfqs           Rfq[]
-  quoteSeries    QuoteSeries[]
-  comparisons    CommercialComparison[]
-  results        TenderResult[]
-  items          TenderItem[]
-  requirements   TenderRequirement[]
-  files          StoredFile[]
-  history        TenderStatusHistory[]
-  generated      GeneratedDocument[]
-  orders         PurchaseOrder[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  securities      Security[]
+  checklist       BidChecklist[]
+  id              String                 @id @default(cuid())
+  number          String                 @unique
+  gemUrl          String?
+  customerId      String?
+  customer        Customer?              @relation(fields: [customerId], references: [id])
+  category        String?
+  deadline        DateTime?
+  emd             Decimal?               @db.Decimal(18, 2)
+  estimatedValue  Decimal?               @db.Decimal(18, 2)
+  warrantyTerms   String?
+  deliveryTerms   String?
+  notes           String?
+  status          TenderStatus           @default(DRAFT)
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  bidNumber       String?
+  title           String?
+  state           String?
+  source          String?
+  sourceUrl       String?
+  publicationDate DateTime?              @db.Date
+  historical      Boolean                @default(false)
+  originalDate    DateTime?              @db.Date
+  recordSource    String                 @default("MANUAL")
+  decisions       TenderDecision[]
+  rfqs            Rfq[]
+  quoteSeries     QuoteSeries[]
+  comparisons     CommercialComparison[]
+  results         TenderResult[]
+  items           TenderItem[]
+  requirements    TenderRequirement[]
+  files           StoredFile[]
+  history         TenderStatusHistory[]
+  generated       GeneratedDocument[]
+  orders          PurchaseOrder[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@index([deadline, status])
 }
@@ -313,6 +316,7 @@ model GeneratedDocument {
 }
 
 model PurchaseOrder {
+  securities       Security[]
   id               String              @id @default(cuid())
   number           String              @unique
   tenderId         String?
@@ -587,6 +591,8 @@ model AuditLog {
 }
 
 model StoredFile {
+  securityId        String?
+  security          Security?          @relation(fields: [securityId], references: [id])
   id                String             @id @default(cuid())
   name              String
   key               String             @unique
@@ -614,10 +620,10 @@ model StoredFile {
   invoice           Invoice?           @relation(fields: [invoiceId], references: [id])
   serviceVisitId    String?
   serviceVisit      ServiceVisit?      @relation(fields: [serviceVisitId], references: [id])
-  rfqId String?
-  rfq Rfq? @relation(fields: [rfqId], references: [id])
-  quotationId String?
-  quotation QuotationRevision? @relation(fields: [quotationId], references: [id])
+  rfqId             String?
+  rfq               Rfq?               @relation(fields: [rfqId], references: [id])
+  quotationId       String?
+  quotation         QuotationRevision? @relation(fields: [quotationId], references: [id])
   generated         GeneratedDocument?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -670,194 +676,310 @@ model AiRequest {
   @@index([userId, createdAt])
 }
 
-
 model TenderDecision {
-  id String @id @default(cuid())
-  tenderId String
-  tender Tender @relation(fields: [tenderId], references: [id])
-  decision String @default("PENDING_REVIEW")
+  id         String   @id @default(cuid())
+  tenderId   String
+  tender     Tender   @relation(fields: [tenderId], references: [id])
+  decision   String   @default("PENDING_REVIEW")
   decisionBy String
   decisionAt DateTime @default(now())
-  reason String?
-  notes String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  reason     String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   @@index([tenderId, decisionAt])
 }
 
 model ManufacturerContact {
-  id String @id @default(cuid())
-  manufacturerId String
-  manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
-  name String
-  designation String?
-  department String?
-  email String?
-  phone String?
-  whatsapp String?
-  region String?
-  category String?
-  preferredChannel String @default("EMAIL")
-  active Boolean @default(true)
-  notes String?
-  rfqs Rfq[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String       @id @default(cuid())
+  manufacturerId   String
+  manufacturer     Manufacturer @relation(fields: [manufacturerId], references: [id])
+  name             String
+  designation      String?
+  department       String?
+  email            String?
+  phone            String?
+  whatsapp         String?
+  region           String?
+  category         String?
+  preferredChannel String       @default("EMAIL")
+  active           Boolean      @default(true)
+  notes            String?
+  rfqs             Rfq[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
   @@index([manufacturerId, active])
 }
 
 model Rfq {
-  id String @id @default(cuid())
-  number String @unique
-  tenderId String?
-  tender Tender? @relation(fields: [tenderId], references: [id])
-  customerId String?
-  customer Customer? @relation(fields: [customerId], references: [id])
-  manufacturerId String
-  manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
-  contactId String?
-  contact ManufacturerContact? @relation(fields: [contactId], references: [id])
-  productId String?
-  product Product? @relation(fields: [productId], references: [id])
-  productName String
-  model String?
-  quantity Int
-  accessories String?
-  warrantyRequirement String?
-  deliveryLocation String?
+  id                   String                 @id @default(cuid())
+  number               String                 @unique
+  tenderId             String?
+  tender               Tender?                @relation(fields: [tenderId], references: [id])
+  customerId           String?
+  customer             Customer?              @relation(fields: [customerId], references: [id])
+  manufacturerId       String
+  manufacturer         Manufacturer           @relation(fields: [manufacturerId], references: [id])
+  contactId            String?
+  contact              ManufacturerContact?   @relation(fields: [contactId], references: [id])
+  productId            String?
+  product              Product?               @relation(fields: [productId], references: [id])
+  productName          String
+  model                String?
+  quantity             Int
+  accessories          String?
+  warrantyRequirement  String?
+  deliveryLocation     String?
   requiredDeliveryTime String?
-  tenderDeadline DateTime?
-  quoteRequiredBy DateTime?
-  assignedToId String?
-  assignee User? @relation(fields: [assignedToId], references: [id])
-  status String @default("DRAFT")
-  sentAt DateTime?
-  receivedAt DateTime?
-  notes String?
-  historical Boolean @default(false)
-  originalDate DateTime? @db.Date
-  recordSource String @default("MANUAL")
-  followUps RfqFollowUp[]
-  quoteSeries QuoteSeries[]
-  comparisons CommercialComparison[]
-  files StoredFile[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  tenderDeadline       DateTime?
+  quoteRequiredBy      DateTime?
+  assignedToId         String?
+  assignee             User?                  @relation(fields: [assignedToId], references: [id])
+  status               String                 @default("DRAFT")
+  sentAt               DateTime?
+  receivedAt           DateTime?
+  notes                String?
+  historical           Boolean                @default(false)
+  originalDate         DateTime?              @db.Date
+  recordSource         String                 @default("MANUAL")
+  followUps            RfqFollowUp[]
+  quoteSeries          QuoteSeries[]
+  comparisons          CommercialComparison[]
+  files                StoredFile[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
   @@index([status, quoteRequiredBy])
   @@index([assignedToId, status])
 }
 
 model RfqFollowUp {
-  id String @id @default(cuid())
-  rfqId String
-  rfq Rfq @relation(fields: [rfqId], references: [id])
-  employeeId String?
+  id          String    @id @default(cuid())
+  rfqId       String
+  rfq         Rfq       @relation(fields: [rfqId], references: [id])
+  employeeId  String?
   contactDate DateTime
-  nextDate DateTime?
-  notes String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  nextDate    DateTime?
+  notes       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([rfqId, nextDate])
 }
 
 model QuoteSeries {
-  id String @id @default(cuid())
-  number String
+  id             String              @id @default(cuid())
+  number         String
   manufacturerId String
-  manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
-  rfqId String?
-  rfq Rfq? @relation(fields: [rfqId], references: [id])
-  tenderId String?
-  tender Tender? @relation(fields: [tenderId], references: [id])
-  productId String?
-  product Product? @relation(fields: [productId], references: [id])
-  revisions QuotationRevision[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  manufacturer   Manufacturer        @relation(fields: [manufacturerId], references: [id])
+  rfqId          String?
+  rfq            Rfq?                @relation(fields: [rfqId], references: [id])
+  tenderId       String?
+  tender         Tender?             @relation(fields: [tenderId], references: [id])
+  productId      String?
+  product        Product?            @relation(fields: [productId], references: [id])
+  revisions      QuotationRevision[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
   @@unique([manufacturerId, number])
   @@index([tenderId])
 }
 
 model QuotationRevision {
-  id String @id @default(cuid())
-  seriesId String
-  series QuoteSeries @relation(fields: [seriesId], references: [id])
-  revision Int
-  number String
-  quotationDate DateTime @db.Date
-  validityDate DateTime? @db.Date
-  currency String @default("INR")
-  productName String
-  model String?
-  quantity Int
-  unitPrice Decimal @db.Decimal(18, 2)
-  baseTotal Decimal @db.Decimal(18, 2)
-  taxAmount Decimal @db.Decimal(18, 2)
-  accessories String?
-  accessoriesCost Decimal @db.Decimal(18, 2)
-  freight Decimal @db.Decimal(18, 2)
-  installation Decimal @db.Decimal(18, 2)
-  warranty String?
-  warrantyCost Decimal @db.Decimal(18, 2)
-  extendedWarrantyCost Decimal @db.Decimal(18, 2)
-  otherCosts Decimal @db.Decimal(18, 2)
-  discount Decimal @db.Decimal(18, 2)
-  total Decimal @db.Decimal(18, 2)
-  finalManufacturerPrice Decimal? @db.Decimal(18, 2)
-  leadTimeDays Int?
-  paymentTerms String?
-  isFinal Boolean @default(false)
-  notes String?
-  historical Boolean @default(false)
-  originalDate DateTime? @db.Date
-  recordSource String @default("MANUAL")
-  comparisons CommercialComparison[]
-  files StoredFile[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String                 @id @default(cuid())
+  seriesId               String
+  series                 QuoteSeries            @relation(fields: [seriesId], references: [id])
+  revision               Int
+  number                 String
+  quotationDate          DateTime               @db.Date
+  validityDate           DateTime?              @db.Date
+  currency               String                 @default("INR")
+  productName            String
+  model                  String?
+  quantity               Int
+  unitPrice              Decimal                @db.Decimal(18, 2)
+  baseTotal              Decimal                @db.Decimal(18, 2)
+  taxAmount              Decimal                @db.Decimal(18, 2)
+  accessories            String?
+  accessoriesCost        Decimal                @db.Decimal(18, 2)
+  freight                Decimal                @db.Decimal(18, 2)
+  installation           Decimal                @db.Decimal(18, 2)
+  warranty               String?
+  warrantyCost           Decimal                @db.Decimal(18, 2)
+  extendedWarrantyCost   Decimal                @db.Decimal(18, 2)
+  otherCosts             Decimal                @db.Decimal(18, 2)
+  discount               Decimal                @db.Decimal(18, 2)
+  total                  Decimal                @db.Decimal(18, 2)
+  finalManufacturerPrice Decimal?               @db.Decimal(18, 2)
+  leadTimeDays           Int?
+  paymentTerms           String?
+  isFinal                Boolean                @default(false)
+  notes                  String?
+  historical             Boolean                @default(false)
+  originalDate           DateTime?              @db.Date
+  recordSource           String                 @default("MANUAL")
+  comparisons            CommercialComparison[]
+  files                  StoredFile[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
   @@unique([seriesId, revision])
   @@index([validityDate])
 }
 
 model CommercialComparison {
-  id String @id @default(cuid())
-  name String
-  tenderId String?
-  tender Tender? @relation(fields: [tenderId], references: [id])
-  rfqId String?
-  rfq Rfq? @relation(fields: [rfqId], references: [id])
-  quoteId String?
-  quote QuotationRevision? @relation(fields: [quoteId], references: [id])
-  currency String @default("INR")
-  procurementCost Decimal @db.Decimal(18, 2)
-  additionalCosts Decimal @db.Decimal(18, 2)
-  sellingPrice Decimal @db.Decimal(18, 2)
-  totalCost Decimal @db.Decimal(18, 2)
-  contribution Decimal @db.Decimal(18, 2)
-  marginPercent Decimal? @db.Decimal(12, 4)
-  leadTimeDays Int?
-  notes String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String             @id @default(cuid())
+  name            String
+  tenderId        String?
+  tender          Tender?            @relation(fields: [tenderId], references: [id])
+  rfqId           String?
+  rfq             Rfq?               @relation(fields: [rfqId], references: [id])
+  quoteId         String?
+  quote           QuotationRevision? @relation(fields: [quoteId], references: [id])
+  currency        String             @default("INR")
+  procurementCost Decimal            @db.Decimal(18, 2)
+  additionalCosts Decimal            @db.Decimal(18, 2)
+  sellingPrice    Decimal            @db.Decimal(18, 2)
+  totalCost       Decimal            @db.Decimal(18, 2)
+  contribution    Decimal            @db.Decimal(18, 2)
+  marginPercent   Decimal?           @db.Decimal(12, 4)
+  leadTimeDays    Int?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
   @@index([tenderId, rfqId])
 }
 
 model TenderResult {
-  id String @id @default(cuid())
-  tenderId String
-  tender Tender @relation(fields: [tenderId], references: [id])
-  outcome String
-  resultDate DateTime @db.Date
-  winner String?
-  winningPrice Decimal? @db.Decimal(18, 2)
+  id             String    @id @default(cuid())
+  tenderId       String
+  tender         Tender    @relation(fields: [tenderId], references: [id])
+  outcome        String
+  resultDate     DateTime  @db.Date
+  winner         String?
+  winningPrice   Decimal?  @db.Decimal(18, 2)
   competitorName String?
-  reason String?
-  notes String?
-  recordedBy String
-  historical Boolean @default(false)
-  originalDate DateTime? @db.Date
-  recordSource String @default("MANUAL")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  reason         String?
+  notes          String?
+  recordedBy     String
+  historical     Boolean   @default(false)
+  originalDate   DateTime? @db.Date
+  recordSource   String    @default("MANUAL")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
   @@index([tenderId, resultDate])
+}
+
+model Security {
+  id                 String         @id @default(cuid())
+  type               String
+  tenderId           String?
+  tender             Tender?        @relation(fields: [tenderId], references: [id])
+  orderId            String?
+  order              PurchaseOrder? @relation(fields: [orderId], references: [id])
+  customerId         String
+  customer           Customer       @relation(fields: [customerId], references: [id])
+  bank               String?
+  reference          String
+  amount             Decimal        @db.Decimal(18, 2)
+  issueDate          DateTime?      @db.Date
+  validityDate       DateTime?      @db.Date
+  claimExpiry        DateTime?      @db.Date
+  expectedRefundDate DateTime?      @db.Date
+  actualRefundDate   DateTime?      @db.Date
+  assignedToId       String?
+  status             String         @default("PLANNED")
+  notes              String?
+  historical         Boolean        @default(false)
+  originalDate       DateTime?      @db.Date
+  recordSource       String         @default("MANUAL")
+  files              StoredFile[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([status, validityDate])
+  @@index([customerId, expectedRefundDate])
+  @@index([tenderId, orderId])
+}
+
+model BidChecklist {
+  id           String   @id @default(cuid())
+  tenderId     String
+  tender       Tender   @relation(fields: [tenderId], references: [id])
+  section      String
+  title        String
+  status       String   @default("PENDING")
+  assignedToId String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenderId, section, title])
+  @@index([tenderId, status])
+}
+
+model ApprovalPolicy {
+  id           String   @id @default(cuid())
+  workflow     String   @unique
+  preventSelf  Boolean  @default(true)
+  approverRole String   @default("ADMIN")
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Approval {
+  id              String          @id @default(cuid())
+  title           String
+  workflow        String
+  relatedModule   String
+  recordId        String
+  relevantVersion DateTime
+  status          String          @default("CREATED")
+  createdById     String
+  approverId      String
+  submittedById   String?
+  submittedAt     DateTime?
+  decisionById    String?
+  decisionAt      DateTime?
+  comments        String?
+  events          ApprovalEvent[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([relatedModule, recordId, status])
+  @@index([approverId, status])
+}
+
+model ApprovalEvent {
+  id              String   @id @default(cuid())
+  approvalId      String
+  approval        Approval @relation(fields: [approvalId], references: [id])
+  fromStatus      String?
+  toStatus        String
+  actorId         String
+  comments        String?
+  relevantVersion DateTime
+  createdAt       DateTime @default(now())
+}
+
+model MailLog {
+  id            String    @id @default(cuid())
+  recipient     String
+  subject       String
+  relatedModule String
+  recordId      String
+  senderId      String
+  status        String    @default("PENDING")
+  providerId    String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([relatedModule, recordId])
 }

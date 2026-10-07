@@ -87,6 +87,9 @@ const selections: Record<string, object> = {
   },
 };
 const dependencies: Record<string, string[]> = {
+  securities: ["tenders", "orders", "customers"],
+  checklist: ["tenders"],
+  approvals: [],
   decisions: ["tenders"],
   results: ["tenders"],
   "manufacturer-contacts": ["manufacturers"],
