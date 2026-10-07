@@ -102,7 +102,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser test signs in, creates a tender through the UI, then exercises order confirmation, private uploads/downloads, local PDF extraction, document generation/review, partial delivery, serials, installations, warranty, AMC, invoices/receipts and notifications through authenticated APIs. It checks denied unauthenticated and restricted-employee access and cross-origin rejection. Synthetic records are confined to medops_test. Unit tests inspect actual DOCX XML, PDF pages, XLSX cells and ZIP members.
+The browser test signs in, creates a tender through the UI, then exercises order confirmation, private uploads/downloads, local PDF extraction, document generation/review, partial delivery, serials, installations, warranty, AMC, invoices/receipts and notifications through authenticated APIs. It checks denied unauthenticated and restricted-employee access, linked-price redaction, source permissions for generated history and cross-origin rejection. Synthetic records are confined to medops_test. Unit tests inspect actual DOCX XML, PDF pages, XLSX cells and ZIP members.
 
 ## Vercel deployment
 

@@ -16,11 +16,15 @@ export default async function setup() {
       passwordHash: hashPassword("synthetic-test-password"),
     },
   });
+  const restrictedPermissions = ["deliveries", "equipment", "generated"].map(
+    (module) => ({ module, read: true, write: false }),
+  );
   await db.user.upsert({
     where: { email: "employee@example.test" },
     create: {
       email: "employee@example.test",
       name: "Restricted Test Employee",
+      permissions: { create: restrictedPermissions },
       role: "EMPLOYEE",
       passwordHash: hashPassword("synthetic-test-password"),
     },
@@ -28,7 +32,7 @@ export default async function setup() {
       active: true,
       role: "EMPLOYEE",
       passwordHash: hashPassword("synthetic-test-password"),
-      permissions: { deleteMany: {} },
+      permissions: { deleteMany: {}, create: restrictedPermissions },
     },
   });
   await db.$disconnect();

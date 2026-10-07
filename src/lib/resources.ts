@@ -1,6 +1,68 @@
 import { schemas, type Resource } from "./schemas";
 import { db } from "./db";
 import { AppError } from "./errors";
+// Linked records expose only the identification and operational fields needed
+// by the owning workflow. Reading equipment or deliveries must not grant prices.
+const customerSummary = {
+  select: {
+    id: true,
+    name: true,
+    address: true,
+    state: true,
+    phone: true,
+    contactName: true,
+  },
+} as const;
+const manufacturerSummary = { select: { id: true, name: true } } as const;
+const tenderSummary = {
+  select: { id: true, number: true, customerId: true, status: true },
+} as const;
+const orderSummary = {
+  select: {
+    id: true,
+    number: true,
+    customerId: true,
+    status: true,
+    deliveryDeadline: true,
+  },
+} as const;
+const itemSummary = {
+  select: {
+    id: true,
+    equipment: true,
+    model: true,
+    quantity: true,
+    manufacturerId: true,
+  },
+} as const;
+const equipmentSummary = {
+  select: {
+    id: true,
+    serialNumber: true,
+    orderItemId: true,
+    deliveryId: true,
+    customerId: true,
+    orderId: true,
+  },
+} as const;
+const amcSummary = {
+  select: {
+    id: true,
+    number: true,
+    customerId: true,
+    status: true,
+    nextServiceDate: true,
+  },
+} as const;
+const invoiceSummary = {
+  select: {
+    id: true,
+    number: true,
+    customerId: true,
+    orderId: true,
+    dueDate: true,
+  },
+} as const;
 export const resources = {
   company: { model: "companyProfile", search: ["legalName"], include: {} },
   customers: { model: "customer", search: ["name", "state"], include: {} },
@@ -8,13 +70,13 @@ export const resources = {
   products: {
     model: "product",
     search: ["name", "model"],
-    include: { manufacturer: true },
+    include: { manufacturer: manufacturerSummary },
   },
   documents: {
     model: "companyDocument",
     search: ["name", "category"],
     include: {
-      manufacturer: true,
+      manufacturer: manufacturerSummary,
       files: { select: { id: true, name: true, version: true } },
     },
   },
@@ -22,8 +84,8 @@ export const resources = {
     model: "tender",
     search: ["number", "category"],
     include: {
-      customer: true,
-      items: { include: { manufacturer: true } },
+      customer: customerSummary,
+      items: { include: { manufacturer: manufacturerSummary } },
       requirements: true,
       history: true,
       files: { select: { id: true, name: true } },
@@ -33,7 +95,10 @@ export const resources = {
   requirements: {
     model: "tenderRequirement",
     search: ["requirement", "specification"],
-    include: { tender: true, files: { select: { id: true, name: true } } },
+    include: {
+      tender: tenderSummary,
+      files: { select: { id: true, name: true } },
+    },
   },
   templates: {
     model: "documentTemplate",
@@ -44,8 +109,8 @@ export const resources = {
     model: "purchaseOrder",
     search: ["number"],
     include: {
-      customer: true,
-      tender: true,
+      customer: customerSummary,
+      tender: tenderSummary,
       items: true,
       files: { select: { id: true, name: true } },
     },
@@ -54,7 +119,7 @@ export const resources = {
     model: "delivery",
     search: ["location", "tracking"],
     include: {
-      order: true,
+      order: orderSummary,
       items: true,
       files: { select: { id: true, name: true } },
     },
@@ -63,8 +128,8 @@ export const resources = {
     model: "equipment",
     search: ["serialNumber"],
     include: {
-      orderItem: true,
-      customer: true,
+      orderItem: itemSummary,
+      customer: customerSummary,
       delivery: true,
       installation: true,
     },
@@ -72,14 +137,16 @@ export const resources = {
   installations: {
     model: "installation",
     search: ["status"],
-    include: { equipment: true },
+    include: { equipment: equipmentSummary },
   },
   warranties: {
     model: "warranty",
     search: ["terms"],
     include: {
       history: true,
-      equipment: { include: { orderItem: true, customer: true } },
+      equipment: {
+        include: { orderItem: itemSummary, customer: customerSummary },
+      },
       files: { select: { id: true, name: true } },
     },
   },
@@ -87,8 +154,8 @@ export const resources = {
     model: "amcContract",
     search: ["number", "status"],
     include: {
-      customer: true,
-      equipment: { include: { equipment: true } },
+      customer: customerSummary,
+      equipment: { include: { equipment: equipmentSummary } },
       visits: true,
       files: { select: { id: true, name: true } },
     },
@@ -96,14 +163,14 @@ export const resources = {
   visits: {
     model: "serviceVisit",
     search: ["status", "complaint"],
-    include: { amc: true, files: { select: { id: true, name: true } } },
+    include: { amc: amcSummary, files: { select: { id: true, name: true } } },
   },
   invoices: {
     model: "invoice",
     search: ["number"],
     include: {
-      customer: true,
-      order: true,
+      customer: customerSummary,
+      order: orderSummary,
       payments: true,
       followUps: true,
       files: { select: { id: true, name: true } },
@@ -112,12 +179,12 @@ export const resources = {
   payments: {
     model: "payment",
     search: ["reference", "method"],
-    include: { invoice: true },
+    include: { invoice: invoiceSummary },
   },
   followups: {
     model: "paymentFollowUp",
     search: ["notes"],
-    include: { invoice: true },
+    include: { invoice: invoiceSummary },
   },
   users: {
     model: "user",
@@ -139,8 +206,8 @@ export const resources = {
     search: ["format"],
     include: {
       file: { select: { id: true, name: true } },
-      tender: true,
-      template: true,
+      tender: tenderSummary,
+      template: { select: { id: true, name: true, kind: true } },
     },
   },
 } as const;

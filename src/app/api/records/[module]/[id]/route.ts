@@ -1,5 +1,5 @@
 import { api, AppError, json } from "@/lib/errors";
-import { authorize, csrf, audit } from "@/lib/auth";
+import { authorize, csrf, audit, can } from "@/lib/auth";
 import { collection, delegate, resources } from "@/lib/resources";
 import { save } from "@/lib/service";
 import { db } from "@/lib/db";
@@ -18,6 +18,11 @@ export async function GET(
     });
     if (!row || (name === "notifications" && row.userId !== user.id))
       throw new AppError(404, "Record not found");
+    if (name === "generated" && !can(user, String(row.sourceModule)))
+      throw new AppError(
+        403,
+        "You do not have permission for the source record",
+      );
     if (name === "users") {
       delete row.passwordHash;
     }

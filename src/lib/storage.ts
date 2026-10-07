@@ -89,7 +89,10 @@ export async function limitedFormData(req: Request) {
 }
 function driver() {
   const d = process.env.STORAGE_DRIVER ?? "local";
-  if (process.env.VERCEL && d !== "blob")
+  if (
+    (process.env.VERCEL || process.env.NODE_ENV === "production") &&
+    d !== "blob"
+  )
     throw new AppError(503, "Production requires private object storage");
   if (d !== "local" && d !== "blob")
     throw new AppError(503, "Unknown storage driver");

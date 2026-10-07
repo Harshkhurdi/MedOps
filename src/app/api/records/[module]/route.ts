@@ -23,6 +23,13 @@ export async function GET(
       where.userId = user.id;
       where.dismissedAt = null;
     }
+    if (name === "generated" && user.role !== "ADMIN") {
+      where.sourceModule = {
+        in: user.permissions
+          .filter((permission) => permission.read)
+          .map((permission) => permission.module),
+      };
+    }
     const status = params.get("status");
     if (
       status &&

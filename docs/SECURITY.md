@@ -5,6 +5,7 @@ This is a single-company employee application. Authorized employees share record
 - scrypt password hashes with random salts; no plaintext passwords in PostgreSQL.
 - Database-backed random sessions stored as SHA-256 hashes, eight-hour expiry, HTTP-only SameSite=Strict cookies. Production uses Secure `__Host-` cookies with Path=/ and no Domain.
 - No public registration. Administrators grant separate View/Edit permissions. Server authorization runs for every protected API, download and review action. Account/permission/password updates revoke existing sessions. The last administrator and current administrator cannot be disabled/demoted inadvertently.
+- Linked-record summaries exclude pricing and financial terms from delivery/equipment/service views. Generated history requires both document-history access and permission for the source business module, including direct record reads.
 - All state-changing browser routes require an exact APP_URL Origin and strict schemas. Login attempts have persistent account-key throttling and a 15-minute lockout. Cron uses constant-time bearer-secret validation.
 - Production requires HTTPS, managed PostgreSQL TLS and private object storage. Files are served through authenticated routes with no-store caching, safe content disposition and nosniff. Public storage URLs are never exposed.
 - Financial/dispatched quantity/serial transactions use Serializable isolation and database constraints. Concurrent conflicts return an actionable retry response. Receipts cannot exceed the invoice balance; no silent financial history edits.

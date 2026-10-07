@@ -278,6 +278,29 @@ test("employee screens, tender-to-payment API workflow, review and private files
   });
   expect(employeeLogin.ok()).toBeTruthy();
   expect((await request.get("/api/records/tenders")).status()).toBe(403);
+  const restrictedEquipmentResponse = await request.get(
+    `/api/records/equipment/${equipment.id}`,
+  );
+  expect(restrictedEquipmentResponse.status()).toBe(200);
+  const restrictedEquipment = await restrictedEquipmentResponse.json();
+  expect(restrictedEquipment.orderItem.unitPrice).toBeUndefined();
+  expect(restrictedEquipment.orderItem.taxRate).toBeUndefined();
+  const restrictedDeliveriesResponse = await request.get(
+    "/api/records/deliveries",
+  );
+  expect(restrictedDeliveriesResponse.status()).toBe(200);
+  for (const row of (await restrictedDeliveriesResponse.json()).rows) {
+    expect(row.order.total).toBeUndefined();
+    expect(row.order.paymentTerms).toBeUndefined();
+  }
+  const restrictedGeneratedResponse = await request.get(
+    "/api/records/generated",
+  );
+  expect(restrictedGeneratedResponse.status()).toBe(200);
+  expect((await restrictedGeneratedResponse.json()).total).toBe(0);
+  expect(
+    (await request.get(`/api/records/generated/${generated.id}`)).status(),
+  ).toBe(403);
   expect((await request.get("/api/files/" + tenderFile.id)).status()).toBe(403);
   expect(
     (

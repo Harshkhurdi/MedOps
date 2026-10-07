@@ -16,7 +16,7 @@ import {
   csrf,
   type Actor,
 } from "@/lib/auth";
-import { validateUpload, MAX_UPLOAD } from "@/lib/storage";
+import { validateUpload, MAX_UPLOAD, store } from "@/lib/storage";
 import { dateReminder } from "@/lib/reminders";
 import { schemas } from "@/lib/schemas";
 describe("exact financial calculations", () => {
@@ -139,4 +139,17 @@ describe("templates", () => {
     ).toBe("Hello Synthetic Co");
     expect(() => renderTemplate("{{missing}}", {})).toThrow("missing");
   });
+});
+
+it("fails closed if local filesystem storage is selected in production", async () => {
+  const previous = process.env.NODE_ENV;
+  Object.assign(process.env, { NODE_ENV: "production" });
+  try {
+    await expect(
+      store(Buffer.from("probe"), "text/plain", ".txt"),
+    ).rejects.toThrow("private object storage");
+  } finally {
+    if (previous === undefined) Reflect.deleteProperty(process.env, "NODE_ENV");
+    else Object.assign(process.env, { NODE_ENV: previous });
+  }
 });
