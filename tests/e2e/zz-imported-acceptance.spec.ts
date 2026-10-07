@@ -148,6 +148,61 @@ test("complete imported A–E lifecycle with source trace and external AI disabl
     "href",
     `https://hospital.example/official-tender-${suffix}`,
   );
+  // A revised source must preserve an employee's quantity until explicit review.
+  await patch("tenders", tender.id, {
+    ...t,
+    items: t.items.map((item) => ({ ...item, quantity: 9 })),
+  });
+  const revisedSource = await integration(
+    "/api/integrations/tender-tracker/import",
+    {
+      grant,
+      tender: {
+        externalTenderId: `synthetic-full-${suffix}`,
+        number: t.number,
+        title: "Public discovery title",
+        institution: customer.name,
+        sourceUrl: `https://hospital.example/official-tender-${suffix}`,
+        sourceName: "Synthetic local discovery",
+        discoveredAt: new Date().toISOString(),
+        deadline: t.deadline,
+        items: [{ id: "line-one", equipment: product.name, quantity: 4 }],
+        documents: [],
+        revisions: [
+          {
+            title: "Quantity revision",
+            url: `https://hospital.example/revised-${suffix}.pdf`,
+          },
+        ],
+        references: [],
+      },
+      selectedItemIds: ["line-one"],
+    },
+  );
+  expect(revisedSource.status).toBe("SOURCE_UPDATE_AVAILABLE");
+  await page.goto(`/tenders?record=${tender.id}`);
+  await expect(page.getByRole("dialog")).toContainText(
+    "Source Update Available",
+  );
+  await expect(page.getByRole("dialog")).toContainText("MedOps quantity: 9");
+  await expect(page.getByRole("dialog")).toContainText("Source quantity: 4");
+  const latestItem = page.locator('[data-source-item-id="line-one"]').first();
+  await latestItem.getByRole("checkbox").check();
+  await latestItem.getByLabel("Reviewed quantity").fill("2");
+  await page
+    .getByLabel(
+      "Replace equipment lines with my selected source items and reviewed quantities",
+    )
+    .check();
+  await page
+    .getByRole("button", { name: "Accept selected source values", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  const reviewedItem = (await get(`/api/records/tenders/${tender.id}`))
+    .items[0];
+  expect(reviewedItem.quantity).toBe(2);
+  expect(reviewedItem.manufacturerId).toBe(manufacturer.id);
+  expect(reviewedItem.productId).toBe(product.id);
   await post("decisions", {
     tenderId: tender.id,
     decision: "PURSUE",

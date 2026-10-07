@@ -67,6 +67,15 @@ export default function TenderSource({
   }, [id]);
   if (error && !data) return <Alert severity="error">{error}</Alert>;
   if (!data?.imports.length) return null;
+  function existingItem(item: TrackerTender["items"][number]) {
+    return Array.isArray(row.items)
+      ? (row.items as Record<string, unknown>[]).find(
+          (prior) =>
+            prior.sourceItemId === item.id ||
+            prior.equipment === item.equipment,
+        )
+      : undefined;
+  }
   const pending = data.imports
     .flatMap((i) => i.versions)
     .filter((v) => v.resolution === "PENDING_REVIEW");
@@ -186,6 +195,7 @@ export default function TenderSource({
                 {version.snapshot.items.map((item) => (
                   <Stack
                     key={item.id}
+                    data-source-item-id={item.id}
                     direction="row"
                     sx={{ alignItems: "center" }}
                     spacing={1}
@@ -210,9 +220,13 @@ export default function TenderSource({
                         />
                       )}
                     <Typography>
-                      {item.equipment} · Quantity:{" "}
+                      {item.equipment} · Source quantity:{" "}
                       {item.quantity ?? item.quantityText ?? "Not available"} ·{" "}
                       {item.category ?? "Category not provided"}
+                      {" · MedOps quantity: "}
+                      {String(
+                        existingItem(item)?.quantity ?? "No matching item",
+                      )}
                     </Typography>
                     {item.sourceUrl && (
                       <Link

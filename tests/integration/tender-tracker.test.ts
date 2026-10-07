@@ -163,6 +163,9 @@ it("preserves manual edits when a corrigendum arrives; applies only reviewed val
   };
   const update = await importTender(input(revised));
   expect(update.status).toBe("SOURCE_UPDATE_AVAILABLE");
+  expect((await importTender(input(revised))).status).toBe(
+    "SOURCE_UPDATE_AVAILABLE",
+  );
   let current = await db.tender.findUniqueOrThrow({
     where: { id: old.id },
     include: { items: true },
@@ -288,6 +291,25 @@ it("enforces durable rate limits and current employee permissions", async () => 
   await db.user.update({ where: { id: actor.id }, data: { role: "EMPLOYEE" } });
   await expect(grantActor(grant)).rejects.toThrow("permission");
   await db.user.update({ where: { id: actor.id }, data: { role: "ADMIN" } });
+});
+it("does not merge distinct numbered tenders sharing a listing page or notice PDF", async () => {
+  const first = await importTender(
+    input({
+      ...source,
+      externalTenderId: "shared-notice-one",
+      number: "NOTICE-ONE",
+    }),
+  );
+  const second = await importTender(
+    input({
+      ...source,
+      externalTenderId: "shared-notice-two",
+      number: "NOTICE-TWO",
+    }),
+  );
+  expect(first.tenderId).not.toBe(second.tenderId);
+  expect(first.status).toBe("ADDED");
+  expect(second.status).toBe("ADDED");
 });
 it("connection codes are single-use and logout revokes the handoff grant", async () => {
   const code = await issueCode(sessionId);

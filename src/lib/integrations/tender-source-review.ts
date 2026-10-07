@@ -63,7 +63,10 @@ export async function reviewSource(
           409,
           "The tender changed. Reload before reviewing the source.",
         );
-      if (data.action === "ACCEPT") {
+      if (
+        data.action === "ACCEPT" &&
+        (data.fields.length > 0 || data.items !== undefined)
+      ) {
         const source = trackerTender.parse(version.snapshot);
         const keys = [
           "number",

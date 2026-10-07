@@ -203,7 +203,20 @@ export async function importTender(input: unknown) {
             OR: [
               { number },
               ...(t.bidNumber ? [{ bidNumber: t.bidNumber }] : []),
-              { sourceUrl: t.sourceUrl },
+              ...(!t.number && !t.bidNumber
+                ? [
+                    {
+                      sourceUrl: t.sourceUrl,
+                      title: t.title,
+                      ...(t.institution
+                        ? { institutionName: t.institution }
+                        : {}),
+                      ...(t.publicationDate
+                        ? { publicationDate: new Date(t.publicationDate) }
+                        : {}),
+                    },
+                  ]
+                : []),
             ],
           },
           select: { id: true },
@@ -299,7 +312,10 @@ export async function importTender(input: unknown) {
         });
         if (!created) status = "SOURCE_UPDATE_AVAILABLE";
       } else if (previous.resolution === "PENDING_REVIEW" && !created) {
-        status = "EXISTING";
+        const earlier = await tx.tenderSourceVersion.count({
+          where: { importId: link.id, receivedAt: { lt: previous.receivedAt } },
+        });
+        status = earlier > 0 ? "SOURCE_UPDATE_AVAILABLE" : "EXISTING";
       }
       await tx.auditLog.create({
         data: {
