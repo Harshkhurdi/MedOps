@@ -1,5 +1,6 @@
 "use client";
 import LookupFilter from "./lookup-filter";
+import TenderSource from "./tender-source";
 import CustomerHistory from "./customer-history";
 import EquipmentHistory from "./equipment-history";
 import ControlSummary from "./control-summary";
@@ -863,6 +864,18 @@ export default function Workspace({
                 <ControlSummary
                   module="checklist"
                   tenderId={String(detail.id)}
+                />
+              )}
+              {module === "tenders" && (
+                <TenderSource
+                  key={String(detail.updatedAt)}
+                  id={String(detail.id)}
+                  row={detail}
+                  writable={writable}
+                  onChanged={() => {
+                    setDetail(null);
+                    void load();
+                  }}
                 />
               )}
               {module === "customers" && (

@@ -43,6 +43,9 @@ export const orderStatuses = [
 ] as const;
 const tenderItem = z
   .object({
+    category: notes,
+    sourceItemId: notes,
+    sourceUrl: z.url().optional().nullable(),
     productId: optionalId,
     equipment: text,
     model: notes,
@@ -138,6 +141,7 @@ export const schemas = {
   tenders: z
     .object({
       number: text,
+      institutionName: notes,
       gemUrl: z
         .url()
         .refine((v) => {
@@ -164,6 +168,7 @@ export const schemas = {
           "PDF_ASSISTED",
           "SYSTEM_GENERATED",
           "FUTURE_IMPORT",
+          "TENDER_TRACKER",
           "FUTURE_ACCOUNTING_SYNC",
         ])
         .default("MANUAL"),

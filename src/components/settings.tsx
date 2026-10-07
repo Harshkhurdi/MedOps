@@ -98,6 +98,7 @@ export default function Settings() {
                   "error",
                   "ai",
                   "administrator",
+                  "tenderTracker",
                 ].includes(k),
             )
             .map(([k, v]) => (
@@ -110,6 +111,25 @@ export default function Settings() {
             Connection secrets are managed outside the application.
           </Typography>
         </Paper>
+        {status.administrator && Boolean(status.tenderTracker) && (
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="h6">Tender Tracker integration</Typography>
+            {Object.entries(
+              status.tenderTracker as Record<string, unknown>,
+            ).map(([key, value]) => (
+              <Typography key={key}>
+                {key}:{" "}
+                {value === null
+                  ? "None"
+                  : value === true
+                    ? "Configured"
+                    : value === false
+                      ? "Not configured"
+                      : String(value)}
+              </Typography>
+            ))}
+          </Paper>
+        )}
         <Paper variant="outlined" sx={{ p: 3 }}>
           <Typography variant="h6">Backup & recovery</Typography>
           <Typography sx={{ mt: 2 }}>

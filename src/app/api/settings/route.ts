@@ -1,5 +1,6 @@
 import { api, AppError, json } from "@/lib/errors";
 import { authorize, csrf, audit } from "@/lib/auth";
+import { integrationHealth } from "@/lib/integrations/tender-tracker";
 import { db } from "@/lib/db";
 import { aiConfiguration } from "@/lib/ai-config";
 import {
@@ -30,6 +31,9 @@ export async function GET() {
       sessionDuration: "8 hours",
       administrator: user.role === "ADMIN",
       ai: config,
+      ...(user.role === "ADMIN"
+        ? { tenderTracker: await integrationHealth() }
+        : {}),
     });
   });
 }

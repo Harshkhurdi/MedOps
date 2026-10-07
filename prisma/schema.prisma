@@ -236,6 +236,8 @@ model CompanyDocument {
 }
 
 model Tender {
+  trackerImports ExternalTenderImport[]
+  institutionName String?
   opportunities   SalesOpportunity[]
   costs           OperationalCost[]
   securities      Security[]
@@ -282,6 +284,9 @@ model Tender {
 }
 
 model TenderItem {
+  category String?
+  sourceItemId String?
+  sourceUrl String?
   productId      String?
   product        Product?      @relation(fields: [productId], references: [id])
   id             String        @id @default(cuid())
@@ -1444,4 +1449,56 @@ model BulkImport {
   updatedAt  DateTime  @updatedAt
 
   @@index([ownerId, status, expiresAt])
+}
+
+// One-way discovery integration. Session/grant identifiers never reach record APIs.
+model TenderTrackerGrant {
+  id String @id @default(cuid())
+  codeHash String @unique
+  codeConsumed Boolean @default(false)
+  tokenHash String? @unique
+  sessionId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}
+model ExternalTenderImport {
+  id String @id @default(cuid())
+  externalSource String @default("TENDER_TRACKER")
+  externalTenderId String
+  externalSourceUrl String
+  tenderId String
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  importedAt DateTime @default(now())
+  sourceUpdatedAt DateTime?
+  versions TenderSourceVersion[]
+  @@unique([externalSource, externalTenderId])
+  @@index([tenderId])
+  @@index([externalSourceUrl])
+}
+model TenderSourceVersion {
+  id String @id @default(cuid())
+  importId String
+  import ExternalTenderImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  fingerprint String
+  snapshot Json
+  discoveredAt DateTime
+  sourceUpdatedAt DateTime?
+  receivedAt DateTime @default(now())
+  resolution String @default("PENDING_REVIEW")
+  resolvedBy String?
+  resolvedAt DateTime?
+  @@unique([importId, fingerprint])
+  @@index([importId, receivedAt])
+}
+model TenderTrackerHealth {
+  id String @id @default("main")
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  failureReason String?
+}
+model TenderTrackerRate {
+  key String @id
+  window DateTime
+  count Int @default(1)
 }

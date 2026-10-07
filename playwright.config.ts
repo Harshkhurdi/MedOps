@@ -22,6 +22,10 @@ export default defineConfig({
       STORAGE_DRIVER: "local",
       LOCAL_STORAGE_PATH: ".local-storage/e2e",
       NEXT_TELEMETRY_DISABLED: "1",
+      TENDER_TRACKER_INTEGRATION_SECRET:
+        "isolated-synthetic-integration-secret-48-characters",
+      TENDER_TRACKER_URL: "http://localhost:3001",
+      INTEGRATION_ENVIRONMENT: "development",
       OPENROUTER_API_KEY: "",
       OPENROUTER_MODEL: "",
       OPENROUTER_ALLOW_PROVIDER_LOGGING: "false",

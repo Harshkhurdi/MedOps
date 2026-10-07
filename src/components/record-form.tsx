@@ -452,14 +452,23 @@ export function RecordForm({
   function normalize(f: Field, value: unknown): unknown {
     if (f.type === "boolean") return Boolean(value);
     if (f.type === "items")
-      return ((value as Row[]) ?? []).map((item) =>
-        Object.fromEntries(
-          (f.fields ?? []).map((sub) => [
-            sub.key,
-            normalize(sub, item[sub.key]),
-          ]),
-        ),
-      );
+      return ((value as Row[]) ?? [])
+        .map((item) =>
+          Object.fromEntries(
+            (f.fields ?? []).map((sub) => [
+              sub.key,
+              normalize(sub, item[sub.key]),
+            ]),
+          ),
+        )
+        .map((normalized, index) =>
+          module === "tenders" && f.key === "items"
+            ? {
+                ...normalized,
+                sourceItemId: (value as Row[])[index].sourceItemId ?? null,
+              }
+            : normalized,
+        );
     if (f.type === "multi" || f.type === "permissions" || f.type === "custom")
       return value;
     if (value === "" || value == null) return f.required ? "" : null;

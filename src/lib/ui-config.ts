@@ -176,10 +176,15 @@ export const configs: Record<string, ModuleConfig> = {
       f("source", "Tender source"),
       f("sourceUrl", "Source URL"),
       f("publicationDate", "Publication date", "date"),
-      ...historicalFields,
+      ...historicalFields.map((field) =>
+        field.key === "recordSource"
+          ? { ...field, options: [...(field.options ?? []), "TENDER_TRACKER"] }
+          : field,
+      ),
       f("number", "Tender number", "text", true),
       f("gemUrl", "GeM tender URL"),
       rel("customerId", "Procuring institution", "customers", false),
+      f("institutionName", "Institution from source"),
       f("category", "Equipment category"),
       f("deadline", "Submission deadline", "datetime-local"),
       f("emd", "EMD (INR)", "number"),
@@ -205,7 +210,11 @@ export const configs: Record<string, ModuleConfig> = {
         label: "Equipment items",
         type: "items",
         required: true,
-        fields: tenderItems,
+        fields: [
+          ...tenderItems,
+          f("category", "Item category"),
+          f("sourceUrl", "Item source URL"),
+        ],
       },
     ],
   },
