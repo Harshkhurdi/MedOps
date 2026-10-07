@@ -7,7 +7,9 @@
 - [x] Phase 5: exact financial totals, partial receipts, follow-ups
 - [x] Phase 6: database dashboard, idempotent reminders, audit records
 - [x] TypeScript, ESLint, unit/document tests, PostgreSQL integration, Playwright, production build
-- [ ] GitHub main push and remote verification
-- [ ] Private storage, managed PostgreSQL, migrations, Vercel deployment and live verification
+- [x] GitHub main push and remote verification
+- [x] Private storage, managed PostgreSQL, migrations, Vercel deployment and live verification
 
 No real company records are used in tests. Production has no synthetic business seeding.
+
+Production login, dashboard, TLS database access, private Blob read/write and access denial verified on 07/10/2026. Synthetic end-to-end records remain in medops_test. Company-approved real-document acceptance and operator backup scheduling remain onboarding tasks.
