@@ -100,7 +100,7 @@ export function hashPassword(password: string) {
 }
 export function verifyPassword(password: string, hash: string) {
   const [salt, key] = hash.split(":");
-  if (!salt || !key || key.length !== 128) return false;
+  if (!salt || !key || !/^[a-f0-9]{128}$/i.test(key)) return false;
   return timingSafeEqual(
     Buffer.from(key, "hex"),
     scryptSync(password, salt, 64),
@@ -170,5 +170,17 @@ export async function createSession(userId: string) {
     sameSite: "strict",
     path: "/",
     maxAge: 8 * 60 * 60,
+  });
+}
+
+// __Host cookies require Secure even when expiring them.
+export async function clearSessionCookie() {
+  (await cookies()).set(COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
   });
 }

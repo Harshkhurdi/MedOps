@@ -2,7 +2,11 @@ import { z } from "zod";
 import { api, json, AppError } from "@/lib/errors";
 import { authorize, csrf } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { confirmImport, importReport } from "@/lib/imports";
+import {
+  confirmImport,
+  importReport,
+  cleanupExpiredImportPreviews,
+} from "@/lib/imports";
 export const maxDuration = 60;
 export async function POST(
   req: Request,
@@ -26,8 +30,9 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   return api(async () => {
-    const u = await authorize("imports"),
-      id = (await ctx.params).id,
+    const u = await authorize("imports");
+    await cleanupExpiredImportPreviews();
+    const id = (await ctx.params).id,
       b = await db.bulkImport.findFirst({ where: { id, ownerId: u.id } });
     if (!b) throw new AppError(404, "Import not found");
     return Response.json({

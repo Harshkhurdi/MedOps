@@ -6,10 +6,9 @@ import {
   hashPassword,
   verifyPassword,
   digest,
-  COOKIE,
+  clearSessionCookie,
 } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cookies } from "next/headers";
 export async function POST(req: Request) {
   return api(async () => {
     csrf(req);
@@ -70,7 +69,7 @@ export async function POST(req: Request) {
         },
       });
     });
-    (await cookies()).delete(COOKIE);
+    await clearSessionCookie();
     await db.loginAttempt.deleteMany({ where: { key } });
     return Response.json({
       message: "Password changed. Sign in with your new password.",

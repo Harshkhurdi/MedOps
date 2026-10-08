@@ -148,6 +148,13 @@ test("complete imported A–E lifecycle with source trace and external AI disabl
     "href",
     `https://hospital.example/official-tender-${suffix}`,
   );
+  await expect(page.getByRole("dialog")).toContainText("Pending Review");
+  await expect(page.getByRole("dialog")).not.toContainText(
+    "Source Update Available",
+  );
+  const firstSource = await get(`/api/tenders/${tender.id}/source`);
+  const originalVersionId = firstSource.imports[0].originalVersionId;
+  expect(originalVersionId).toBe(firstSource.imports[0].versions[0].id);
   // A revised source must preserve an employee's quantity until explicit review.
   await patch("tenders", tender.id, {
     ...t,
@@ -180,6 +187,9 @@ test("complete imported A–E lifecycle with source trace and external AI disabl
     },
   );
   expect(revisedSource.status).toBe("SOURCE_UPDATE_AVAILABLE");
+  const revisedTrace = await get(`/api/tenders/${tender.id}/source`);
+  expect(revisedTrace.imports[0].originalVersionId).toBe(originalVersionId);
+  expect(revisedTrace.imports[0].versions[0].id).not.toBe(originalVersionId);
   await page.goto(`/tenders?record=${tender.id}`);
   await expect(page.getByRole("dialog")).toContainText(
     "Source Update Available",

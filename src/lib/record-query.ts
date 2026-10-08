@@ -167,9 +167,19 @@ export async function recordWhere(
       dimension === "manufacturerId" &&
       ["orders", "tenders"].includes(name)
     )
-      where.items = { some: { manufacturerId: value } };
+      where.items = {
+        some: {
+          ...((where.items as { some?: object })?.some ?? {}),
+          manufacturerId: value,
+        },
+      };
     else if (dimension === "productId" && ["orders", "tenders"].includes(name))
-      where.items = { some: { productId: value } };
+      where.items = {
+        some: {
+          ...((where.items as { some?: object })?.some ?? {}),
+          productId: value,
+        },
+      };
     else
       throw new AppError(
         400,

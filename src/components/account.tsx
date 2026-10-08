@@ -46,6 +46,8 @@ export default function Account() {
       {error && <Alert severity="error">{error}</Alert>}
       <Paper
         component="form"
+        method="post"
+        action="/api/auth/password"
         onSubmit={submit}
         variant="outlined"
         sx={{ p: 3, maxWidth: 600 }}

@@ -116,3 +116,42 @@ it("does not make observation-only refreshes into destructive source changes", (
     ),
   ).not.toBe(sourceFingerprint(a));
 });
+
+it("ignores metadata ordering but retains item order and source provenance", () => {
+  const documents = [
+    { label: "A", url: "https://example.test/a" },
+    { label: "B", url: "https://example.test/b" },
+  ];
+  const a = trackerTender.parse({
+    ...tender,
+    documents,
+    references: documents,
+    revisions: [{ title: "A" }, { title: "B" }],
+  });
+  const b = {
+    ...a,
+    documents: [...a.documents].reverse(),
+    references: [...a.references].reverse(),
+    revisions: [...a.revisions].reverse(),
+  };
+  expect(sourceFingerprint(a)).toBe(sourceFingerprint(b));
+  expect(sourceFingerprint({ ...a, items: [...a.items].reverse() })).not.toBe(
+    sourceFingerprint(a),
+  );
+  expect(
+    sourceFingerprint({ ...a, sourceUrl: "https://example.test/mirror" }),
+  ).not.toBe(sourceFingerprint(a));
+});
+it.each(["ftp://localhost:3001", "file://localhost/", "javascript:alert(1)"])(
+  "rejects non-web integration URL %s",
+  (value) => {
+    process.env.TENDER_TRACKER_URL = value;
+    expect(() => integrationConfig()).toThrow("environment");
+  },
+);
+it("requires HTTPS for hosted preview integration", () => {
+  process.env.INTEGRATION_ENVIRONMENT = "preview";
+  process.env.APP_URL = "https://medops-preview.example.test";
+  process.env.TENDER_TRACKER_URL = "http://tracker-preview.example.test";
+  expect(() => integrationConfig()).toThrow("environment");
+});

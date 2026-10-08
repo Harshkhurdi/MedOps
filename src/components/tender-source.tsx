@@ -22,6 +22,7 @@ type Version = {
 };
 type Import = {
   id: string;
+  originalVersionId: string | null;
   externalTenderId: string;
   externalSourceUrl: string;
   importedAt: string;
@@ -139,9 +140,9 @@ export default function TenderSource({
               >
                 <summary>
                   {version.resolution === "PENDING_REVIEW"
-                    ? link.versions.length > 1
-                      ? "Source Update Available"
-                      : "Pending Review"
+                    ? version.id === link.originalVersionId
+                      ? "Pending Review"
+                      : "Source Update Available"
                     : version.resolution === "ACCEPTED"
                       ? "Source accepted"
                       : "MedOps values kept"}{" "}

@@ -90,12 +90,25 @@ async function duplicateImport(
   )
     throw new AppError(409, "Matching payment already recorded");
 }
+// Retain completed reports, but erase abandoned source rows after their review window.
+export async function cleanupExpiredImportPreviews(now = new Date()) {
+  return db.bulkImport.deleteMany({
+    where: {
+      status: "PREVIEW",
+      expiresAt: { lte: now },
+      leaseUntil: null,
+    },
+  });
+}
 export async function previewImport(user: Actor, input: unknown) {
   const v = previewSchema.parse(input);
   access(user, v.module);
+  await cleanupExpiredImportPreviews();
   const name = collection(v.module),
     fields = configs[name].fields.filter((f) => f.type !== "items"),
     keys = new Set(fields.map((f) => f.key));
+  if (new Set(v.headers).size !== v.headers.length)
+    throw new AppError(400, "Use distinct column headings");
   if (Object.keys(v.mapping).some((k) => !keys.has(k)))
     throw new AppError(400, "Unknown destination field in mapping");
   if (Object.values(v.mapping).some((h) => !v.headers.includes(h)))

@@ -128,7 +128,7 @@ export default function Shell({
               : m) && p.read,
     );
   const drawer = (
-    <Box sx={{ height: "100%", bgcolor: "#142d39", color: "#dbe7ea" }}>
+    <Box sx={{ minHeight: "100%", flexShrink: 0, bgcolor: "#142d39", color: "#dbe7ea" }}>
       <Box sx={{ p: 3 }}>
         <Typography variant="h4" color="white">
           MedOps<span style={{ color: "#6fe0c9" }}>.</span>
@@ -208,7 +208,7 @@ export default function Shell({
           onClose={() => setMobile(false)}
           sx={{
             display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": { width: 252 },
+            "& .MuiDrawer-paper": { width: 252, bgcolor: "#142d39" },
           }}
         >
           {drawer}
@@ -217,7 +217,7 @@ export default function Shell({
           variant="permanent"
           sx={{
             display: { xs: "none", md: "block" },
-            "& .MuiDrawer-paper": { width: 252, border: 0 },
+            "& .MuiDrawer-paper": { width: 252, border: 0, bgcolor: "#142d39" },
           }}
           open
         >

@@ -2,7 +2,11 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { db } from "../db";
 import { AppError } from "../errors";
 import { can, digest } from "../auth";
-import { trackerImport, type TrackerTender } from "./tender-tracker-contract";
+import {
+  trackerImport,
+  trackerTender,
+  type TrackerTender,
+} from "./tender-tracker-contract";
 import type { Prisma } from "@/generated/prisma/client";
 export const integrationPrefix = "/api/integrations/tender-tracker";
 export function integrationConfig() {
@@ -21,12 +25,13 @@ export function integrationConfig() {
   for (const value of [tracker, app]) {
     const u = new URL(value);
     if (
+      !["http:", "https:"].includes(u.protocol) ||
       u.username ||
       u.password ||
       u.pathname !== "/" ||
       u.search ||
       u.hash ||
-      (environment === "production" && u.protocol !== "https:") ||
+      (environment !== "development" && u.protocol !== "https:") ||
       (environment !== "production" &&
         !["localhost", "127.0.0.1"].includes(u.hostname) &&
         environment === "development")
@@ -172,7 +177,18 @@ export function sourceFingerprint(t: TrackerTender) {
   const { discoveredAt, sourceUpdatedAt, ...content } = t;
   void discoveredAt;
   void sourceUpdatedAt;
-  return digest(JSON.stringify(content));
+  const sorted = <T>(rows: T[]) =>
+    [...rows].sort((a, b) =>
+      JSON.stringify(a).localeCompare(JSON.stringify(b)),
+    );
+  return digest(
+    JSON.stringify({
+      ...content,
+      documents: sorted(content.documents),
+      references: sorted(content.references),
+      revisions: sorted(content.revisions),
+    }),
+  );
 }
 export async function importTender(input: unknown) {
   const payload = trackerImport.parse(input),
@@ -286,9 +302,36 @@ export async function importTender(input: unknown) {
           },
         });
       }
-      const previous = await tx.tenderSourceVersion.findUnique({
+      let previous = await tx.tenderSourceVersion.findUnique({
         where: { importId_fingerprint: { importId: link.id, fingerprint } },
       });
+      // Upgrade legacy order-sensitive hashes without creating false source revisions.
+      if (!previous) {
+        let cursor: string | undefined;
+        while (!previous) {
+          const versions = await tx.tenderSourceVersion.findMany({
+            where: { importId: link.id },
+            orderBy: { id: "asc" },
+            take: 100,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          });
+          for (const version of versions) {
+            const parsed = trackerTender.safeParse(version.snapshot);
+            if (
+              parsed.success &&
+              sourceFingerprint(parsed.data) === fingerprint
+            ) {
+              previous = await tx.tenderSourceVersion.update({
+                where: { id: version.id },
+                data: { fingerprint },
+              });
+              break;
+            }
+          }
+          if (versions.length < 100) break;
+          cursor = versions[versions.length - 1].id;
+        }
+      }
       let status = created ? "ADDED" : "EXISTING";
       if (!previous) {
         await tx.tenderSourceVersion.create({

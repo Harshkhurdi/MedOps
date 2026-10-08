@@ -108,25 +108,6 @@ export async function prepareRevenue(
         throw new AppError(400, "Cost product/manufacturer do not match");
       data.manufacturerId ||= p.manufacturerId;
     }
-    if (data.orderId) {
-      const o = await tx.purchaseOrder.findUnique({
-        where: { id: String(data.orderId) },
-      });
-      if (
-        !o ||
-        o.customerId !== data.customerId ||
-        (data.tenderId && o.tenderId && o.tenderId !== data.tenderId)
-      )
-        throw new AppError(400, "Cost order must match customer/tender");
-      data.tenderId ||= o.tenderId;
-    }
-    if (data.tenderId) {
-      const t = await tx.tender.findUnique({
-        where: { id: String(data.tenderId) },
-      });
-      if (!t || (t.customerId && t.customerId !== data.customerId))
-        throw new AppError(400, "Cost tender must match customer");
-    }
     if (data.deliveryId) {
       const d = await tx.delivery.findUnique({
         where: { id: String(data.deliveryId) },
@@ -168,6 +149,25 @@ export async function prepareRevenue(
           "Cost service ticket must match customer/order",
         );
       data.orderId ||= t.equipment?.orderId;
+    }
+    if (data.orderId) {
+      const o = await tx.purchaseOrder.findUnique({
+        where: { id: String(data.orderId) },
+      });
+      if (
+        !o ||
+        o.customerId !== data.customerId ||
+        (data.tenderId && o.tenderId && o.tenderId !== data.tenderId)
+      )
+        throw new AppError(400, "Cost order must match customer/tender");
+      data.tenderId ||= o.tenderId;
+    }
+    if (data.tenderId) {
+      const t = await tx.tender.findUnique({
+        where: { id: String(data.tenderId) },
+      });
+      if (!t || (t.customerId && t.customerId !== data.customerId))
+        throw new AppError(400, "Cost tender must match customer");
     }
     if (data.deliveryId || data.installationId || data.ticketId)
       data.postSale = true;

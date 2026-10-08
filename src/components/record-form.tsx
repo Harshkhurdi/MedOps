@@ -725,7 +725,7 @@ export function RecordForm({
     );
   }
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} method="post" action={`/api/records/${module}`}>
       <Stack spacing={2} sx={{ py: 1 }}>
         {error && <Alert severity="error">{error}</Alert>}
         {info && <Alert severity="info">{info}</Alert>}

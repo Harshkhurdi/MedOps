@@ -18,7 +18,20 @@ export async function GET(
       where: { tenderId: id },
       include: { versions: { orderBy: { receivedAt: "desc" }, take: 100 } },
     });
-    return Response.json({ updatedAt: tender.updatedAt, imports });
+    const tracedImports = await Promise.all(
+      imports.map(async (link) => {
+        const original = await db.tenderSourceVersion.findFirst({
+          where: { importId: link.id },
+          orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
+          select: { id: true },
+        });
+        return { ...link, originalVersionId: original?.id ?? null };
+      }),
+    );
+    return Response.json({
+      updatedAt: tender.updatedAt,
+      imports: tracedImports,
+    });
   });
 }
 export async function POST(

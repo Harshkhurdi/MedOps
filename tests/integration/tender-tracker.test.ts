@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, createHash } from "node:crypto";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { db } from "@/lib/db";
 import { hashPassword, type Actor } from "@/lib/auth";
@@ -108,6 +108,7 @@ it("imports only selected known quantities, pending review, with immutable sourc
     documents: source.documents,
   });
 });
+
 it("makes concurrent double clicks and retries idempotent", async () => {
   const results = await Promise.all(
     Array.from({ length: 4 }, () => importTender(input())),
@@ -311,6 +312,44 @@ it("does not merge distinct numbered tenders sharing a listing page or notice PD
   expect(first.status).toBe("ADDED");
   expect(second.status).toBe("ADDED");
 });
+it("upgrades legacy fingerprints without duplicating reordered source metadata", async () => {
+  const tender = {
+    ...source,
+    externalTenderId: "SYNTHETIC-LEGACY-HASH",
+    number: "SYNTHETIC-LEGACY-HASH",
+    documents: [
+      ...source.documents,
+      { label: "BOQ", url: "https://hospital.example/boq.pdf" },
+    ],
+  };
+  const first = await importTender(input(tender));
+  const link = await db.externalTenderImport.findFirstOrThrow({
+    where: { tenderId: first.tenderId },
+  });
+  const version = await db.tenderSourceVersion.findFirstOrThrow({
+    where: { importId: link.id },
+  });
+  const { discoveredAt, sourceUpdatedAt, ...content } =
+    version.snapshot as Record<string, unknown>;
+  void discoveredAt;
+  void sourceUpdatedAt;
+  await db.tenderSourceVersion.update({
+    where: { id: version.id },
+    data: {
+      fingerprint: createHash("sha256")
+        .update(JSON.stringify(content))
+        .digest("hex"),
+    },
+  });
+  const repeat = await importTender(
+    input({ ...tender, documents: [...tender.documents].reverse() }),
+  );
+  expect(repeat.tenderId).toBe(first.tenderId);
+  expect(
+    await db.tenderSourceVersion.count({ where: { importId: link.id } }),
+  ).toBe(1);
+});
+
 it("connection codes are single-use and logout revokes the handoff grant", async () => {
   const code = await issueCode(sessionId);
   await exchangeCode(code);

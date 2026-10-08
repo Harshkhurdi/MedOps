@@ -2,7 +2,11 @@ import { beforeAll, afterAll, it, expect } from "vitest";
 import { db } from "@/lib/db";
 import { hashPassword, type Actor } from "@/lib/auth";
 import { save } from "@/lib/service";
-import { previewImport, confirmImport } from "@/lib/imports";
+import {
+  previewImport,
+  confirmImport,
+  cleanupExpiredImportPreviews,
+} from "@/lib/imports";
 import { universalSearch } from "@/lib/search";
 import { todaysBrief } from "@/lib/brief";
 import { accountingRows } from "@/lib/accounting";
@@ -449,4 +453,40 @@ it("rejects impossible historical dates during import preview without normalizin
   expect(batch.preview[0].status).toBe("REJECTED");
   expect((await confirmImport(admin, batch.id)).rejectedCount).toBe(1);
   expect(await db.customer.count({ where: { name } })).toBe(0);
+});
+
+it("erases only abandoned expired previews and rejects ambiguous headings", async () => {
+  const base = {
+    module: "customers",
+    ownerId: admin.id,
+    payload: [{ name: "expired private source" }],
+    preview: [],
+    expiresAt: new Date(0),
+  };
+  const abandoned = await db.bulkImport.create({ data: base });
+  const complete = await db.bulkImport.create({
+    data: { ...base, status: "COMPLETE" },
+  });
+  const importing = await db.bulkImport.create({
+    data: { ...base, status: "IMPORTING" },
+  });
+  const active = await db.bulkImport.create({
+    data: { ...base, expiresAt: new Date(Date.now() + 60000) },
+  });
+  await cleanupExpiredImportPreviews();
+  expect(
+    await db.bulkImport.findUnique({ where: { id: abandoned.id } }),
+  ).toBeNull();
+  for (const batch of [complete, importing, active])
+    expect(
+      await db.bulkImport.findUnique({ where: { id: batch.id } }),
+    ).not.toBeNull();
+  await expect(
+    previewImport(admin, {
+      module: "customers",
+      headers: ["name", "name"],
+      rows: [["A", "B"]],
+      mapping: { name: "name" },
+    }),
+  ).rejects.toThrow("distinct column headings");
 });
