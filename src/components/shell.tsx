@@ -231,7 +231,7 @@ export default function Shell({
           color="inherit"
           sx={{ borderBottom: "1px solid #dfe5e9" }}
         >
-          <Toolbar sx={{ gap: 2 }}>
+          <Toolbar sx={{ gap: { xs: 1, md: 2 }, flexWrap: "wrap", py: { xs: 1, md: 0 } }}>
             <IconButton
               sx={{ display: { md: "none" } }}
               onClick={() => setMobile(true)}
@@ -239,7 +239,7 @@ export default function Shell({
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ flex: { xs: "1 1 calc(100% - 56px)", md: 1 }, minWidth: 0, overflowWrap: "anywhere" }}>
               Company operations / {pathname.split("/")[1]}
             </Typography>
             {allowed("search") && <GlobalSearch />}
@@ -253,7 +253,7 @@ export default function Shell({
             >
               {user.name[0]}
             </Avatar>
-            <Button component={Link} href="/account" size="small">
+            <Button component={Link} href="/account" size="small" sx={{ maxWidth: "100%", overflowWrap: "anywhere" }}>
               {user.name}
             </Button>
             <Button
