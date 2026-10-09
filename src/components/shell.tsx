@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
+  Alert,
   AppBar,
   Avatar,
   Box,
@@ -115,7 +116,9 @@ export default function Shell({
   const router = useRouter();
   const pathname = usePathname(),
     [mobile, setMobile] = useState(false),
-    [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+    [collapsed, setCollapsed] = useState<Record<string, boolean>>({}),
+    [signingOut, setSigningOut] = useState(false),
+    [signOutError, setSignOutError] = useState("");
   const allowed = (m: string) =>
     user.role === "ADMIN" ||
     user.permissions.some(
@@ -128,7 +131,14 @@ export default function Shell({
               : m) && p.read,
     );
   const drawer = (
-    <Box sx={{ minHeight: "100%", flexShrink: 0, bgcolor: "#142d39", color: "#dbe7ea" }}>
+    <Box
+      sx={{
+        minHeight: "100%",
+        flexShrink: 0,
+        bgcolor: "#142d39",
+        color: "#dbe7ea",
+      }}
+    >
       <Box sx={{ p: 3 }}>
         <Typography variant="h4" color="white">
           MedOps<span style={{ color: "#6fe0c9" }}>.</span>
@@ -231,7 +241,13 @@ export default function Shell({
           color="inherit"
           sx={{ borderBottom: "1px solid #dfe5e9" }}
         >
-          <Toolbar sx={{ gap: { xs: 1, md: 2 }, flexWrap: "wrap", py: { xs: 1, md: 0 } }}>
+          <Toolbar
+            sx={{
+              gap: { xs: 1, md: 2 },
+              flexWrap: "wrap",
+              py: { xs: 1, md: 0 },
+            }}
+          >
             <IconButton
               sx={{ display: { md: "none" } }}
               onClick={() => setMobile(true)}
@@ -239,7 +255,15 @@ export default function Shell({
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="body2" color="text.secondary" sx={{ flex: { xs: "1 1 calc(100% - 56px)", md: 1 }, minWidth: 0, overflowWrap: "anywhere" }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                flex: { xs: "1 1 calc(100% - 56px)", md: 1 },
+                minWidth: 0,
+                overflowWrap: "anywhere",
+              }}
+            >
               Company operations / {pathname.split("/")[1]}
             </Typography>
             {allowed("search") && <GlobalSearch />}
@@ -253,24 +277,49 @@ export default function Shell({
             >
               {user.name[0]}
             </Avatar>
-            <Button component={Link} href="/account" size="small" sx={{ maxWidth: "100%", overflowWrap: "anywhere" }}>
+            <Button
+              component={Link}
+              href="/account"
+              size="small"
+              sx={{ maxWidth: "100%", overflowWrap: "anywhere" }}
+            >
               {user.name}
             </Button>
             <Button
               size="small"
+              disabled={signingOut}
               onClick={async () => {
-                await fetch("/api/auth/logout", { method: "POST" });
-                for (const key of Object.keys(sessionStorage))
-                  if (key.startsWith("medops-draft:"))
-                    sessionStorage.removeItem(key);
-                router.push("/login");
-                router.refresh();
+                setSigningOut(true);
+                setSignOutError("");
+                try {
+                  const response = await fetch("/api/auth/logout", {
+                    method: "POST",
+                  });
+                  if (!response.ok)
+                    throw new Error("Sign out failed. Try again.");
+                  try {
+                    for (const key of Object.keys(sessionStorage))
+                      if (key.startsWith("medops-draft:"))
+                        sessionStorage.removeItem(key);
+                  } catch {
+                    // Storage restrictions must not prevent a completed sign-out.
+                  }
+                  router.push("/login");
+                  router.refresh();
+                } catch {
+                  setSignOutError(
+                    "Could not sign out. Check your connection and try again.",
+                  );
+                } finally {
+                  setSigningOut(false);
+                }
               }}
             >
               Sign out
             </Button>
           </Toolbar>
         </AppBar>
+        {signOutError && <Alert severity="error">{signOutError}</Alert>}
         <Box
           component="main"
           sx={{ p: { xs: 2, md: 4 }, maxWidth: 1600, mx: "auto" }}

@@ -4,7 +4,8 @@ import TenderSource from "./tender-source";
 import CustomerHistory from "./customer-history";
 import EquipmentHistory from "./equipment-history";
 import ControlSummary from "./control-summary";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Alert,
@@ -14,6 +15,7 @@ import {
   CircularProgress,
   Dialog,
   DialogContent,
+  DialogActions,
   DialogTitle,
   Divider,
   LinearProgress,
@@ -245,6 +247,12 @@ export default function Workspace({
   canExport?: boolean;
   allowedModules?: string[];
 }) {
+  const searchParams = useSearchParams();
+  const parent = searchParams.get("parent") ?? "";
+  const recordId = searchParams.get("record");
+  const sourceModule = searchParams.get("from");
+  const sourceId = searchParams.get("id");
+  const listRequest = useRef<AbortController | null>(null);
   const [serviceNote, setServiceNote] = useState("");
   const [gemUrl, setGemUrl] = useState(""),
     [gemMessage, setGemMessage] = useState("");
@@ -268,28 +276,37 @@ export default function Workspace({
     ...(dimension && dimensionValue ? { [dimension]: dimensionValue } : {}),
   }).toString();
   const load = useCallback(async () => {
+    listRequest.current?.abort();
+    const control = new AbortController();
+    listRequest.current = control;
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/records/${module}?page=${page + 1}&q=${encodeURIComponent(q)}&status=${status}&sort=${sort}&${filters}&parent=${typeof window !== "undefined" ? encodeURIComponent(new URLSearchParams(window.location.search).get("parent") ?? "") : ""}`,
+        `/api/records/${module}?page=${page + 1}&q=${encodeURIComponent(q)}&status=${status}&sort=${sort}&${filters}&parent=${encodeURIComponent(parent)}`,
+        { signal: control.signal },
       );
       const data = await response.json();
+      if (control.signal.aborted) return;
       if (!response.ok) throw new Error(data.error);
       setError("");
       setRows(data.rows);
       setTotal(data.total);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load records");
+      if (!control.signal.aborted)
+        setError(e instanceof Error ? e.message : "Could not load records");
     } finally {
-      setLoading(false);
+      if (!control.signal.aborted) setLoading(false);
     }
-  }, [module, page, q, status, sort, filters]);
+  }, [module, page, q, status, sort, filters, parent]);
   useEffect(() => {
     const timer = setTimeout(() => void load(), 200);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      listRequest.current?.abort();
+    };
   }, [load]);
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("record");
+    const id = recordId;
     if (!id) return;
     const c = new AbortController();
     fetch(`/api/records/${module}/${encodeURIComponent(id)}`, {
@@ -304,11 +321,10 @@ export default function Workspace({
         if (e.name !== "AbortError") setError(e.message);
       });
     return () => c.abort();
-  }, [module]);
+  }, [module, recordId]);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search),
-      from = params.get("from"),
-      id = params.get("id");
+    const from = sourceModule,
+      id = sourceId;
     if (
       !writable ||
       !id ||
@@ -370,7 +386,7 @@ export default function Workspace({
         if (e.name !== "AbortError") setError(e.message);
       });
     return () => control.abort();
-  }, [module, writable]);
+  }, [module, writable, sourceModule, sourceId]);
   const tabs = Object.entries(groups)
     .find(
       ([parent, children]) =>
@@ -638,15 +654,26 @@ export default function Workspace({
           </Box>
         ) : !rows.length ? (
           <Box sx={{ p: 6, textAlign: "center" }}>
-            <Typography variant="h6">No records yet</Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Your saved business records will appear here.
+            <Typography variant="h6">
+              {q || status || filters || parent
+                ? "No matching records"
+                : "No records yet"}
             </Typography>
-            {writable && !config.readOnly && (
-              <Button sx={{ mt: 2 }} onClick={() => setForm(null)}>
-                Create your first record
-              </Button>
-            )}
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              {q || status || filters || parent
+                ? "Adjust your search or filters to find saved records."
+                : "Your saved business records will appear here."}
+            </Typography>
+            {!q &&
+              !status &&
+              !filters &&
+              !parent &&
+              writable &&
+              !config.readOnly && (
+                <Button sx={{ mt: 2 }} onClick={() => setForm(null)}>
+                  Create your first record
+                </Button>
+              )}
           </Box>
         ) : (
           <TableContainer>
@@ -728,17 +755,18 @@ export default function Workspace({
       </Paper>
       <Dialog
         open={form !== false}
+        aria-labelledby="record-form-title"
         onClose={() => setForm(false)}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
+        <DialogTitle id="record-form-title">
           {form && !form.__new ? "Edit" : "Create"} {config.title.toLowerCase()}
         </DialogTitle>
         <DialogContent>
           {form !== false && (
             <RecordForm
-              key={String(form?.id ?? "new")}
+              key={`${module}:${String(form?.id ?? `${sourceModule}:${sourceId}`)}`}
               module={module}
               config={config}
               row={form ?? undefined}
@@ -753,11 +781,14 @@ export default function Workspace({
       </Dialog>
       <Dialog
         open={Boolean(detail)}
+        aria-labelledby="record-detail-title"
         onClose={() => setDetail(null)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>{config.title} record</DialogTitle>
+        <DialogTitle id="record-detail-title">
+          {config.title} record
+        </DialogTitle>
         <DialogContent>
           {detail && (
             <Stack spacing={2}>
@@ -966,6 +997,9 @@ export default function Workspace({
             </Stack>
           )}
         </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetail(null)}>Close record</Button>
+        </DialogActions>
       </Dialog>
     </Stack>
   );

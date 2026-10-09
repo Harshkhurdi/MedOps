@@ -192,3 +192,7 @@ Operational costs validate the order and tender after resolving delivery, instal
 Source fingerprints ignore document/reference/revision ordering without losing substantive source changes. Existing legacy fingerprints are recognized without creating false versions. The source review explicitly identifies the original version even when only the latest 100 versions are shown, preserving **Pending Review** for the original and **Source Update Available** for subsequent pending revisions. Source changes never overwrite employee values without approval.
 
 Production dependency scanning reported zero advisories on 8 October 2026. The full development-tool audit still reports the upstream `braces` advisory through ESLint; no patched compatible `braces` release is available. The suggested framework lint downgrade is not applied. No database schema change or production data migration is required for these corrections.
+
+### Functional audit — 9 October 2026
+
+The expanded audit passed 161 tests (87 unit/document, 52 isolated PostgreSQL integration, 22 browser scenarios), including all 51 register screens and full manual/imported operational lifecycles. It fixes service-ticket coverage, tender/order prefill, deadline timezone conversion, completed-record controls, report permissions and attribution, document preview state, reviewed email retries, upload versioning and backup verification. See [the audit record](docs/AUDIT_2026_10_09.md) for validation and live-service acceptance limits. No database migration is required.

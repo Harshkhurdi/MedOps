@@ -23,13 +23,13 @@ Use a separate private backup store/account with restricted administrator access
 npx tsx scripts/backup-files.ts /approved/private/backup-directory
 ```
 
-All file versions should be backed up, including generated history. Compare SHA-256 checksums and StoredFile counts. A same-account Blob store is not an independent disaster-recovery copy. Schedule this export outside Vercel functions on trusted infrastructure; Vercel's local filesystem is not durable.
+All file versions should be backed up, including generated history. The export checks each object's size and SHA-256 against its database record before writing it. Compare StoredFile counts and retain the database dump from the matching snapshot. A same-account Blob store is not an independent disaster-recovery copy. Schedule this export outside Vercel functions on trusted infrastructure; Vercel's local filesystem is not durable.
 
 ## Recovery drill
 
 1. Create isolated PostgreSQL and a separate private document store. Restrict users during restoration.
 2. Decrypt the approved backup, verify checksums and run `pg_restore --no-owner --no-acl --dbname="$RESTORE_DATABASE_URL" medops-backup.dump`.
-3. Restore objects using `scripts/restore-files.ts`, which verifies SHA-256 and atomically updates the restored database's object keys. It requires `MEDOPS_RESTORE_CONFIRM=isolated-restore` to avoid accidental execution. Use the restored database connection, never the live database.
+3. Restore objects using `scripts/restore-files.ts`, which verifies the complete inventory against the restored database and checks every object's SHA-256 before writing. After all objects upload successfully, it updates the restored database's keys in one transaction. It requires `MEDOPS_RESTORE_CONFIRM=isolated-restore` to avoid accidental execution. Use the restored database connection, never the live database. A failed upload or database transaction keeps the original keys and can leave unreferenced objects in the isolated recovery store; remove those only after comparing its inventory with database references.
 4. Run migration status; do not reset a restored database. Validate login, file download/history, order/invoice balances and record counts.
 5. Compare inventories and validate representative DOCX/PDF/XLSX files. Record recovery time and missing data, then correct backup procedures.
 6. Switch application configuration only after the company administrator approves the completed recovery. Revoke old sessions as part of incident recovery.

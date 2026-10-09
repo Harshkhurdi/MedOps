@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Alert,
   Button,
@@ -24,6 +24,7 @@ export default function Communication() {
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [error, setError] = useState("");
+  const requestId = useRef<string | null>(null);
   useEffect(() => {
     fetch("/api/communication")
       .then(async (r) => {
@@ -36,6 +37,8 @@ export default function Communication() {
   function change(k: string, v: string) {
     setForm({ ...form, [k]: v });
     setConfirmed(false);
+    setMessage("");
+    if (k !== "phone") requestId.current = null;
   }
   return (
     <Stack spacing={2}>
@@ -55,6 +58,7 @@ export default function Communication() {
       <TextField
         select
         label="Related module"
+        disabled={busy}
         value={form.relatedModule}
         onChange={(e) => change("relatedModule", e.target.value)}
       >
@@ -73,6 +77,7 @@ export default function Communication() {
       ].map(([k, label]) => (
         <TextField
           key={k}
+          disabled={busy}
           label={label}
           value={form[k as keyof typeof form]}
           onChange={(e) => change(k, e.target.value)}
@@ -84,6 +89,7 @@ export default function Communication() {
         control={
           <Checkbox
             checked={confirmed}
+            disabled={busy}
             onChange={(e) => setConfirmed(e.target.checked)}
           />
         }
@@ -96,6 +102,9 @@ export default function Communication() {
           onClick={async () => {
             setBusy(true);
             setError("");
+            setMessage("");
+            setConfirmed(false);
+            requestId.current ??= crypto.randomUUID();
             try {
               const { phone: _, ...data } = form;
               void _;
@@ -105,11 +114,12 @@ export default function Communication() {
                 body: JSON.stringify({
                   ...data,
                   confirmed,
-                  requestId: crypto.randomUUID(),
+                  requestId: requestId.current,
                 }),
               });
               const d = await r.json();
               if (!r.ok) throw new Error(d.error);
+              requestId.current = null;
               setMessage("Email sending confirmed");
               setConfirmed(false);
             } catch (e) {

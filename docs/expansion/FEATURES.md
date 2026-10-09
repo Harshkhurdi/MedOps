@@ -1,6 +1,6 @@
 # MedOps expansion features and operating limits
 
-All business workflows remain manual and database-backed. Optional providers do not gate the business lifecycle. No external LLM processing was added to these features. The separate Tender Tracker is not integrated.
+All business workflows remain manual and database-backed. Optional providers do not gate the business lifecycle. No external LLM processing was added to these features. The separate Tender Tracker supports an optional, employee-confirmed discovery import; it shares no business database or document store with MedOps.
 
 ## Commercial and controls
 

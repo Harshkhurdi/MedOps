@@ -23,7 +23,7 @@ type DashboardData = {
     invoiced: string;
     received: string;
     overdue: string;
-    byCustomer: { name: string; amount: string }[];
+    byCustomer: { id: string; name: string; amount: string }[];
     recentPayments: Record<string, unknown>[];
     expectedThisMonth: Record<string, unknown>[];
     followups: Record<string, unknown>[];
@@ -147,7 +147,7 @@ export default function Dashboard() {
           </Typography>
           {data.finances.byCustomer.length ? (
             data.finances.byCustomer.map((c) => (
-              <Typography key={c.name} sx={{ mt: 1 }}>
+              <Typography key={c.id} sx={{ mt: 1 }}>
                 {c.name}: {pretty(c.amount, "amount")}
               </Typography>
             ))

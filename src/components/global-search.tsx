@@ -5,6 +5,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogActions,
   DialogTitle,
   List,
   ListItemButton,
@@ -21,7 +22,8 @@ export default function GlobalSearch() {
   const [open, setOpen] = useState(false),
     [q, setQ] = useState(""),
     [groups, setGroups] = useState<Group[]>([]),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(false);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -40,12 +42,17 @@ export default function GlobalSearch() {
         fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: c.signal })
           .then(async (r) => {
             const d = await r.json();
+            if (c.signal.aborted) return;
             if (!r.ok) throw new Error(d.error);
             setGroups(d.groups);
             setError("");
+            setLoading(false);
           })
           .catch((e) => {
-            if (e.name !== "AbortError") setError(e.message);
+            if (!c.signal.aborted) {
+              setError(e.message);
+              setLoading(false);
+            }
           }),
       250,
     );
@@ -61,11 +68,12 @@ export default function GlobalSearch() {
       </Button>
       <Dialog
         open={open}
+        aria-labelledby="global-search-title"
         onClose={() => setOpen(false)}
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Search MedOps</DialogTitle>
+        <DialogTitle id="global-search-title">Search MedOps</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -75,13 +83,19 @@ export default function GlobalSearch() {
             onChange={(e) => {
               setQ(e.target.value);
               setGroups([]);
+              setError("");
+              setLoading(e.target.value.trim().length >= 2);
             }}
             sx={{ mt: 1 }}
           />
           {error && <Alert severity="error">{error}</Alert>}
-          {q.length < 2 ? (
+          {q.trim().length < 2 ? (
             <Typography sx={{ mt: 2 }}>
               Enter at least two characters.
+            </Typography>
+          ) : loading ? (
+            <Typography role="status" sx={{ mt: 2 }}>
+              Searching records…
             </Typography>
           ) : groups.length ? (
             groups.map((g) => (
@@ -101,10 +115,13 @@ export default function GlobalSearch() {
                 ))}
               </List>
             ))
-          ) : (
+          ) : !error ? (
             <Typography sx={{ mt: 2 }}>No matching records.</Typography>
-          )}
+          ) : null}
         </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>Close search</Button>
+        </DialogActions>
       </Dialog>
     </>
   );

@@ -92,6 +92,19 @@ test("Phase C legacy registration, engineer visits, draft restore, stock use and
     await request.get(`/api/service/tickets/${ticket.id}/coverage`)
   ).json();
   expect(coverage.warrantyStatus).toBe("Active");
+  await page.goto(`/tickets?record=${ticket.id}`);
+  await expect(
+    page.getByRole("heading", {
+      name: "Actual warranty / AMC coverage",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByText("Active", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog").locator(".MuiAlert-standardError"),
+  ).toHaveCount(0);
   const visit = await create("ticket-visits", {
     ticketId: ticket.id,
     engineerId: admin.id,

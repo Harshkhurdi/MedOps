@@ -326,6 +326,11 @@ export async function save(
         ((await tx.delivery.count({ where: { orderId: id } })) ||
           (await tx.invoice.count({ where: { orderId: id } })))
       ) {
+        if (old.confirmed && !data.confirmed)
+          throw new AppError(
+            400,
+            "Order confirmation is locked after dispatch or invoicing",
+          );
         const normalized = (v: unknown) =>
           v instanceof Date ? v.toISOString() : String(v ?? "");
         const locked = [
@@ -438,6 +443,16 @@ export async function save(
           where: { deliveryId: id },
         });
         if (
+          registered.length &&
+          (!data.confirmed ||
+            (old?.actualDate as Date | null)?.getTime() !==
+              (data.actualDate as Date | null)?.getTime())
+        )
+          throw new AppError(
+            400,
+            "Delivery confirmation and actual date are locked after serial registration",
+          );
+        if (
           registered.some(
             (e) => !items.some((i) => i.orderItemId === e.orderItemId),
           )
@@ -523,17 +538,6 @@ export async function save(
             400,
             "Enter the actual equipment name for historical registration",
           );
-        if (data.productId) {
-          const p = await tx.product.findUnique({
-            where: { id: String(data.productId) },
-          });
-          if (
-            !p ||
-            (data.manufacturerId && p.manufacturerId !== data.manufacturerId)
-          )
-            throw new AppError(400, "Product and manufacturer do not match");
-          data.manufacturerId ||= p.manufacturerId;
-        }
       } else {
         const delivery = await tx.delivery.findUnique({
           where: { id: String(data.deliveryId) },
@@ -565,10 +569,34 @@ export async function save(
         const orderItem = await tx.purchaseOrderItem.findUniqueOrThrow({
           where: { id: String(data.orderItemId) },
         });
+        if (
+          (data.manufacturerId &&
+            orderItem.manufacturerId &&
+            data.manufacturerId !== orderItem.manufacturerId) ||
+          (data.productId &&
+            orderItem.productId &&
+            data.productId !== orderItem.productId)
+        )
+          throw new AppError(
+            400,
+            "Equipment product and manufacturer must match the delivered order item",
+          );
         data.manufacturerId ||= orderItem.manufacturerId;
         data.productId ||= orderItem.productId;
         data.productName ||= orderItem.equipment;
         data.model ||= orderItem.model;
+      }
+      if (data.productId) {
+        const product = await tx.product.findUnique({
+          where: { id: String(data.productId) },
+        });
+        if (
+          !product ||
+          (data.manufacturerId &&
+            product.manufacturerId !== data.manufacturerId)
+        )
+          throw new AppError(400, "Product and manufacturer do not match");
+        data.manufacturerId ||= product.manufacturerId;
       }
     }
     if (name === "installations") {
@@ -698,6 +726,13 @@ export async function save(
       };
     }
     if (name === "visits") {
+      if (old && ["COMPLETED", "CANCELLED"].includes(String(old.status)))
+        throw new AppError(405, "Completed/cancelled visits are immutable");
+      if (old && old.amcId !== data.amcId)
+        throw new AppError(
+          400,
+          "Service visit cannot move to another contract",
+        );
       const contract = await tx.amcContract.findUnique({
         where: { id: String(data.amcId) },
       });
@@ -718,8 +753,19 @@ export async function save(
           "Completion cannot precede the scheduled visit",
         );
       if (data.status === "COMPLETED") {
+        const latest = await tx.serviceVisit.findFirst({
+          where: {
+            amcId: contract.id,
+            status: "COMPLETED",
+            ...(id ? { id: { not: id } } : {}),
+          },
+          orderBy: { completedDate: "desc" },
+        });
+        const completedDate = data.completedDate as Date;
         const next = addMonths(
-          data.completedDate as Date,
+          latest?.completedDate && latest.completedDate > completedDate
+            ? latest.completedDate
+            : completedDate,
           contract.serviceFrequencyMonths,
         );
         await tx.amcContract.update({
@@ -727,6 +773,17 @@ export async function save(
           data: { nextServiceDate: next <= contract.endDate ? next : null },
         });
       }
+    }
+    if (name === "followups") {
+      if (data.nextDate && data.nextDate < data.contactDate!)
+        throw new AppError(400, "Follow-up cannot precede contact");
+      if (
+        data.employeeId &&
+        !(await tx.user.findFirst({
+          where: { id: String(data.employeeId), active: true },
+        }))
+      )
+        throw new AppError(400, "Choose an active employee");
     }
     if (name === "invoices") {
       const order = await tx.purchaseOrder.findUnique({

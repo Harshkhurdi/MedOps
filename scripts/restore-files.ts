@@ -1,10 +1,13 @@
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { createHash } from "node:crypto";
-import { z } from "zod";
 import { db } from "../src/lib/db";
 import { store } from "../src/lib/storage";
+import {
+  backupInventory,
+  restoreBackupFiles,
+  verifyBackupRecords,
+} from "./file-backup";
 if (process.env.MEDOPS_RESTORE_CONFIRM !== "isolated-restore")
   throw new Error(
     "Set MEDOPS_RESTORE_CONFIRM=isolated-restore only for an isolated recovery database",
@@ -12,34 +15,28 @@ if (process.env.MEDOPS_RESTORE_CONFIRM !== "isolated-restore")
 const directory = process.argv[2];
 if (!directory || !path.isAbsolute(directory))
   throw new Error("Provide an absolute backup directory");
-const inventory = z
-  .object({
-    files: z.array(
-      z.object({
-        id: z.string().regex(/^[a-zA-Z0-9]+$/),
-        name: z.string(),
-        sha256: z.string(),
-        mime: z.string(),
-        size: z.number(),
-      }),
-    ),
-  })
-  .parse(
-    JSON.parse(await readFile(path.join(directory, "inventory.json"), "utf8")),
-  );
-for (const file of inventory.files) {
-  const bytes = await readFile(path.join(directory, file.id + ".bin"));
-  if (
-    bytes.length !== file.size ||
-    createHash("sha256").update(bytes).digest("hex") !== file.sha256
-  )
-    throw new Error("Backup checksum mismatch");
-  const saved = await store(bytes, file.mime, path.extname(file.name));
-  await db.storedFile.update({
-    where: { id: file.id },
-    data: { key: saved.key },
-  });
-}
+const inventory = backupInventory.parse(
+  JSON.parse(await readFile(path.join(directory, "inventory.json"), "utf8")),
+);
+verifyBackupRecords(inventory.files, await db.storedFile.findMany());
+await restoreBackupFiles(inventory.files, {
+  read: (file) => readFile(path.join(directory, file.id + ".bin")),
+  store: (file, bytes) => store(bytes, file.mime, path.extname(file.name)),
+  commit: async (saved) => {
+    await db.$transaction(
+      async (tx) => {
+        verifyBackupRecords(inventory.files, await tx.storedFile.findMany());
+        for (const file of saved) {
+          await tx.storedFile.update({
+            where: { id: file.id },
+            data: { key: file.key },
+          });
+        }
+      },
+      { isolationLevel: "Serializable", timeout: 60000 },
+    );
+  },
+});
 console.log(
   `Restored ${inventory.files.length} file versions; verify before switching application configuration.`,
 );

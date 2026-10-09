@@ -28,6 +28,12 @@ export default function Account() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
+      try {
+        for (const key of Object.keys(sessionStorage))
+          if (key.startsWith("medops-draft:")) sessionStorage.removeItem(key);
+      } catch {
+        // The password is already changed even when browser storage is unavailable.
+      }
       router.push("/login");
       router.refresh();
     } catch (e) {

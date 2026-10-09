@@ -66,6 +66,7 @@ const selections: Record<string, object> = {
       select: {
         equipment: true,
         model: true,
+        productId: true,
         manufacturerId: true,
         quantity: true,
       },
@@ -83,6 +84,7 @@ const selections: Record<string, object> = {
         id: true,
         equipment: true,
         model: true,
+        productId: true,
         manufacturerId: true,
         quantity: true,
       },

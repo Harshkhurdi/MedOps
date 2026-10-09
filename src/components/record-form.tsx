@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Alert,
   Autocomplete,
@@ -103,19 +103,25 @@ export function Relation({
   onChange,
   root,
   multiple = false,
+  disabled = false,
 }: {
   field: Field;
   value: unknown;
   onChange: (value: unknown) => void;
   root: Row;
   multiple?: boolean;
+  disabled?: boolean;
 }) {
   const [options, setOptions] = useState<Row[]>([]),
-    [search, setSearch] = useState("");
+    [search, setSearch] = useState(""),
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(false);
   useEffect(() => {
     const control = new AbortController();
     const timer = setTimeout(async () => {
       try {
+        setLoading(true);
+        setError("");
         if (field.source === "orderItems") {
           const orderId = root.orderId;
           if (!orderId) {
@@ -128,10 +134,10 @@ export function Relation({
               signal: control.signal,
             },
           );
-          if (response.ok) {
-            const data = await response.json();
-            setOptions(data.rows?.[0]?.items ?? []);
-          }
+          const data = await response.json();
+          if (!response.ok)
+            throw new Error(data.error || "Could not load order items");
+          setOptions(data.rows?.[0]?.items ?? []);
           return;
         }
         if (field.source === "files") {
@@ -141,10 +147,10 @@ export function Relation({
               signal: control.signal,
             },
           );
-          if (response.ok) {
-            const data = await response.json();
-            setOptions(data.rows.flatMap((r: Row) => (r.files ?? []) as Row[]));
-          }
+          const data = await response.json();
+          if (!response.ok)
+            throw new Error(data.error || "Could not load files");
+          setOptions(data.rows.flatMap((r: Row) => (r.files ?? []) as Row[]));
           return;
         }
         const response = await fetch(
@@ -153,18 +159,25 @@ export function Relation({
             : `/api/lookups/${field.source}?for=${root.__module ?? ""}&q=${encodeURIComponent(search)}&ids=${encodeURIComponent((multiple ? ((value as string[]) ?? []) : value ? [String(value)] : []).join(","))}&manufacturerId=${encodeURIComponent(String(root.manufacturerId ?? ""))}&customerId=${encodeURIComponent(String(root.customerId ?? ""))}&invoiceId=${encodeURIComponent(String(root.invoiceId ?? ""))}`,
           { signal: control.signal },
         );
-        if (!response.ok) {
-          setOptions([]);
-          return;
-        }
         const data = await response.json();
+        if (!response.ok)
+          throw new Error(data.error || "Could not load saved records");
         let rows = data.rows as Row[];
         if (field.key === "tenderId" && root.items)
           rows = rows.filter((r) => r.status === "WON");
         if (field.source === "equipment" && root.customerId)
           rows = rows.filter((r) => r.customerId === root.customerId);
         setOptions(rows);
-      } catch {}
+      } catch (e) {
+        if (!control.signal.aborted) {
+          setOptions([]);
+          setError(
+            e instanceof Error ? e.message : "Could not load saved records",
+          );
+        }
+      } finally {
+        if (!control.signal.aborted) setLoading(false);
+      }
     }, 250);
     return () => {
       clearTimeout(timer);
@@ -192,6 +205,9 @@ export function Relation({
   return (
     <Autocomplete<Row, boolean, false, false>
       multiple={multiple}
+      disabled={disabled}
+      loading={loading}
+      noOptionsText={error || "No matching saved records"}
       options={options}
       value={selected as Row | Row[] | null}
       filterOptions={(x) => x}
@@ -199,7 +215,7 @@ export function Relation({
       getOptionLabel={(r) => label(r)}
       getOptionKey={(r) => String(r.id)}
       onInputChange={(_, v, reason) => {
-        if (reason === "input") setSearch(v);
+        if (reason === "input" || reason === "clear") setSearch(v);
       }}
       onChange={(_, v) =>
         onChange(
@@ -212,12 +228,22 @@ export function Relation({
         <TextField
           {...params}
           label={field.label}
-          required={field.required && !value}
-          helperText="Type to search saved records"
+          required={
+            field.required &&
+            (multiple ? !((value as unknown[]) ?? []).length : !value)
+          }
+          error={Boolean(error)}
+          helperText={error || "Type to search saved records"}
         />
       )}
     />
   );
+}
+function localDateTime(value: unknown) {
+  const date = new Date(String(value));
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
 }
 function initial(config: ModuleConfig, row?: Row) {
   const values: Row = {};
@@ -239,10 +265,7 @@ function initial(config: ModuleConfig, row?: Row) {
     if (f.key === "requestId" && !value) value = crypto.randomUUID();
     if (f.type === "date" && value) value = String(value).slice(0, 10);
     if (f.type === "datetime-local" && value) {
-      const d = new Date(String(value));
-      value = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+      value = localDateTime(value);
     }
     if (f.key === "equipmentIds" && row?.equipment)
       value = (row.equipment as Row[]).map((e) => e.equipmentId);
@@ -268,6 +291,7 @@ export function RecordForm({
     [info, setInfo] = useState(""),
     [busy, setBusy] = useState(false);
   const [draftUser, setDraftUser] = useState("");
+  const fieldRequest = useRef(0);
   useEffect(() => {
     if (!["tickets", "ticket-visits"].includes(module)) return;
     const c = new AbortController();
@@ -315,138 +339,202 @@ export function RecordForm({
     }
   }
   async function setField(key: string, value: unknown) {
+    const request = ++fieldRequest.current;
     setValues((v) => ({ ...v, [key]: value }));
-    if (module === "tickets" && key === "equipmentId" && value) {
-      const r = await fetch(
-        `/api/lookups/equipment?for=tickets&ids=${encodeURIComponent(String(value))}`,
-      );
-      if (r.ok) {
-        const e = (await r.json()).rows[0];
-        if (e)
+    try {
+      if (module === "tickets" && key === "equipmentId" && value) {
+        const r = await fetch(
+          `/api/lookups/equipment?for=tickets&ids=${encodeURIComponent(String(value))}`,
+        );
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const e = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (e)
+            setValues((v) => ({
+              ...v,
+              customerId: e.customerId,
+              serialNumber: e.serialNumber,
+              productName: e.productName ?? "",
+              manufacturerId: e.manufacturerId ?? "",
+              model: e.model ?? "",
+              department: e.department ?? "",
+            }));
+        }
+      }
+      if (module === "rfqs" && key === "tenderId" && value) {
+        const r = await fetch(
+          `/api/lookups/tenders?for=rfqs&ids=${encodeURIComponent(String(value))}`,
+        );
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const t = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (t)
+            setValues((v) => ({
+              ...v,
+              customerId: t.customerId ?? "",
+              productName: t.items[0]?.equipment ?? "",
+              model: t.items[0]?.model ?? "",
+              quantity: t.items[0]?.quantity ?? 1,
+              manufacturerId: t.items[0]?.manufacturerId ?? "",
+              warrantyRequirement: t.warrantyTerms ?? "",
+              tenderDeadline: t.deadline ? localDateTime(t.deadline) : "",
+            }));
+        }
+      }
+      if (["rfqs", "quotes"].includes(module) && key === "productId" && value) {
+        const r = await fetch(
+          `/api/lookups/products?for=${module}&ids=${encodeURIComponent(String(value))}`,
+        );
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const p = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (p)
+            setValues((v) => ({
+              ...v,
+              productName: p.name,
+              model: p.model,
+              manufacturerId: p.manufacturerId,
+            }));
+        }
+      }
+      if (module === "quotes" && key === "rfqId" && value) {
+        const r = await fetch(
+          `/api/lookups/rfqs?for=quotes&ids=${encodeURIComponent(String(value))}`,
+        );
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const q = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (q)
+            setValues((v) => ({
+              ...v,
+              manufacturerId: q.manufacturerId,
+              tenderId: q.tenderId ?? "",
+              productId: q.productId ?? "",
+              productName: q.productName,
+              model: q.model ?? "",
+              quantity: q.quantity,
+            }));
+        }
+      }
+      if (module === "orders" && key === "tenderId" && value) {
+        const r = await fetch(`/api/lookups/tenders?for=orders&ids=${value}`);
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const t = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (!t) return;
           setValues((v) => ({
             ...v,
-            customerId: e.customerId,
-            serialNumber: e.serialNumber,
-            productName: e.productName ?? "",
-            manufacturerId: e.manufacturerId ?? "",
-            model: e.model ?? "",
-            department: e.department ?? "",
+            customerId: t.customerId,
+            deliveryDeadline: "",
+            items: t.items.map((i: Row) => ({
+              productId: i.productId ?? "",
+              equipment: i.equipment,
+              model: i.model ?? "",
+              manufacturerId: i.manufacturerId ?? "",
+              quantity: i.quantity,
+              unitPrice: "",
+              taxRate: "0",
+            })),
           }));
+        }
       }
-    }
-    if (module === "rfqs" && key === "tenderId" && value) {
-      const r = await fetch(
-        `/api/lookups/tenders?for=rfqs&ids=${encodeURIComponent(String(value))}`,
-      );
-      if (r.ok) {
-        const t = (await r.json()).rows[0];
-        if (t)
+      if (
+        ["deliveries", "invoices"].includes(module) &&
+        key === "orderId" &&
+        value
+      ) {
+        const r = await fetch(`/api/lookups/orders?for=${module}&ids=${value}`);
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const o = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (!o) return;
           setValues((v) => ({
             ...v,
-            customerId: t.customerId ?? "",
-            productName: t.items[0]?.equipment ?? "",
-            model: t.items[0]?.model ?? "",
-            quantity: t.items[0]?.quantity ?? 1,
-            manufacturerId: t.items[0]?.manufacturerId ?? "",
-            warrantyRequirement: t.warrantyTerms ?? "",
-            tenderDeadline: t.deadline
-              ? new Date(t.deadline).toISOString().slice(0, 16)
-              : "",
+            customerId: o.customerId,
+            ...(module === "deliveries"
+              ? {
+                  location: o.customer?.address ?? "",
+                  items: o.items.map((i: Row) => ({
+                    orderItemId: i.id,
+                    quantity: 1,
+                  })),
+                }
+              : { paymentTermDays: v.paymentTermDays || 30 }),
           }));
+        }
       }
-    }
-    if (["rfqs", "quotes"].includes(module) && key === "productId" && value) {
-      const r = await fetch(
-        `/api/lookups/products?for=${module}&ids=${encodeURIComponent(String(value))}`,
-      );
-      if (r.ok) {
-        const p = (await r.json()).rows[0];
-        if (p)
+      if (module === "equipment" && key === "deliveryId" && value) {
+        const r = await fetch(
+          `/api/lookups/deliveries?for=equipment&ids=${value}`,
+        );
+        if (!r.ok) {
+          const data = await r.json();
+          throw new Error(
+            data.error || "Could not load linked record information",
+          );
+        }
+        if (request !== fieldRequest.current) return;
+        if (r.ok) {
+          const d = (await r.json()).rows[0];
+          if (request !== fieldRequest.current) return;
+          if (!d) return;
           setValues((v) => ({
             ...v,
-            productName: p.name,
-            model: p.model,
-            manufacturerId: p.manufacturerId,
+            orderId: d.orderId,
+            customerId: d.order.customerId,
+            orderItemId: d.items[0]?.orderItemId ?? "",
           }));
+        }
       }
-    }
-    if (module === "quotes" && key === "rfqId" && value) {
-      const r = await fetch(
-        `/api/lookups/rfqs?for=quotes&ids=${encodeURIComponent(String(value))}`,
-      );
-      if (r.ok) {
-        const q = (await r.json()).rows[0];
-        if (q)
-          setValues((v) => ({
-            ...v,
-            manufacturerId: q.manufacturerId,
-            tenderId: q.tenderId ?? "",
-            productId: q.productId ?? "",
-            productName: q.productName,
-            model: q.model ?? "",
-            quantity: q.quantity,
-          }));
-      }
-    }
-    if (module === "orders" && key === "tenderId" && value) {
-      const r = await fetch(`/api/lookups/tenders?for=orders&ids=${value}`);
-      if (r.ok) {
-        const t = (await r.json()).rows[0];
-        if (!t) return;
-        setValues((v) => ({
-          ...v,
-          customerId: t.customerId,
-          deliveryDeadline: "",
-          paymentTerms: t.deliveryTerms ?? "",
-          items: t.items.map((i: Row) => ({
-            equipment: i.equipment,
-            model: i.model ?? "",
-            manufacturerId: i.manufacturerId ?? "",
-            quantity: i.quantity,
-            unitPrice: "",
-            taxRate: "0",
-          })),
-        }));
-      }
-    }
-    if (
-      ["deliveries", "invoices"].includes(module) &&
-      key === "orderId" &&
-      value
-    ) {
-      const r = await fetch(`/api/lookups/orders?for=${module}&ids=${value}`);
-      if (r.ok) {
-        const o = (await r.json()).rows[0];
-        if (!o) return;
-        setValues((v) => ({
-          ...v,
-          customerId: o.customerId,
-          ...(module === "deliveries"
-            ? {
-                location: o.customer?.address ?? "",
-                items: o.items.map((i: Row) => ({
-                  orderItemId: i.id,
-                  quantity: 1,
-                })),
-              }
-            : { paymentTermDays: v.paymentTermDays || 30 }),
-        }));
-      }
-    }
-    if (module === "equipment" && key === "deliveryId" && value) {
-      const r = await fetch(
-        `/api/lookups/deliveries?for=equipment&ids=${value}`,
-      );
-      if (r.ok) {
-        const d = (await r.json()).rows[0];
-        if (!d) return;
-        setValues((v) => ({
-          ...v,
-          orderId: d.orderId,
-          customerId: d.order.customerId,
-          orderItemId: d.items[0]?.orderItemId ?? "",
-        }));
-      }
+    } catch (e) {
+      if (request === fieldRequest.current)
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Could not load linked record information. Review the fields before saving.",
+        );
     }
   }
   function normalize(f: Field, value: unknown): unknown {

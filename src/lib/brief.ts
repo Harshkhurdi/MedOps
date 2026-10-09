@@ -54,7 +54,9 @@ export async function todaysBrief(
     for (const t of await db.tender.findMany({
       where: { status: { notIn: ["WON", "LOST", "CANCELLED"] } },
       include: {
-        decisions: { orderBy: { decisionAt: "desc" }, take: 1 },
+        decisions: canResource(user, "decisions")
+          ? { orderBy: { decisionAt: "desc" }, take: 1 }
+          : false,
         checklist: true,
         requirements: true,
       },
@@ -63,9 +65,10 @@ export async function todaysBrief(
       if (t.deadline && t.deadline <= until)
         add("tenders", t.id, t.number, "Closing soon", t.deadline);
       if (
-        !t.decisions[0] ||
-        t.decisions[0].decision === "PENDING_REVIEW" ||
-        t.decisions[0].decision === "REVIEW_LATER"
+        canResource(user, "decisions") &&
+        (!t.decisions?.[0] ||
+          t.decisions[0].decision === "PENDING_REVIEW" ||
+          t.decisions[0].decision === "REVIEW_LATER")
       )
         add("tenders", t.id, t.number, "Awaiting decision");
       if (

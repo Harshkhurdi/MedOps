@@ -101,7 +101,13 @@ export async function GET() {
         received = 0n,
         overdue = 0n,
         overdueCount = 0;
-      const byCustomer = new Map<string, bigint>();
+      const byCustomer = new Map<string, { name: string; amount: bigint }>();
+      const month = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+      });
+      const currentMonth = month.format(now);
       const expectedThisMonth: object[] = [];
       for (const i of invoices) {
         const ledger = invoiceLedger(i.total, i.payments, i.adjustments),
@@ -114,15 +120,11 @@ export async function GET() {
           overdue += out;
           overdueCount++;
         }
-        byCustomer.set(
-          i.customer.name,
-          (byCustomer.get(i.customer.name) ?? 0n) + out,
-        );
-        if (
-          out > 0n &&
-          i.dueDate.getUTCMonth() === now.getUTCMonth() &&
-          i.dueDate.getUTCFullYear() === now.getUTCFullYear()
-        )
+        byCustomer.set(i.customerId, {
+          name: i.customer.name,
+          amount: (byCustomer.get(i.customerId)?.amount ?? 0n) + out,
+        });
+        if (out > 0n && month.format(i.dueDate) === currentMonth)
           expectedThisMonth.push({
             number: i.number,
             dueDate: i.dueDate,
@@ -142,9 +144,10 @@ export async function GET() {
         invoiced: money(total),
         received: money(received),
         overdue: money(overdue),
-        byCustomer: [...byCustomer].map(([name, amount]) => ({
-          name,
-          amount: money(amount),
+        byCustomer: [...byCustomer].map(([id, customer]) => ({
+          id,
+          name: customer.name,
+          amount: money(customer.amount),
         })),
         expectedThisMonth,
         recentPayments: can(user, "payments")

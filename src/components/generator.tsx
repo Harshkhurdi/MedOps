@@ -26,13 +26,31 @@ export default function Generator() {
     [fileId, setFileId] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    fetch("/api/records/templates?limit=100")
-      .then((r) => r.json())
-      .then((d) => setTemplates((d.rows ?? []).filter((t: Row) => t.approved)));
+    const control = new AbortController();
+    fetch("/api/records/templates?limit=100", { signal: control.signal })
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok)
+          throw new Error(d.error || "Could not load approved templates");
+        setTemplates((d.rows ?? []).filter((t: Row) => t.approved));
+      })
+      .catch((e) => {
+        if (!control.signal.aborted) setMessage(e.message);
+      });
+    return () => control.abort();
   }, []);
   const [companyDocumentIds, setCompanyDocumentIds] = useState<string[]>([]);
+  function clearSource() {
+    setPreview("");
+    setValues({});
+    setBody("");
+    setFileId("");
+    setMessage("");
+  }
   async function bundle() {
     setBusy(true);
+    setFileId("");
+    setMessage("");
     try {
       const r = await fetch(`/api/tenders/${sourceId}/package`, {
         method: "POST",
@@ -61,6 +79,7 @@ export default function Generator() {
   async function generate(isPreview: boolean) {
     setBusy(true);
     setMessage("");
+    setFileId("");
     try {
       const r = await fetch("/api/generate", {
         method: "POST",
@@ -122,13 +141,11 @@ export default function Generator() {
           <TextField
             select
             label="Approved template"
+            disabled={busy}
             value={templateId}
             onChange={(e) => {
               setTemplateId(e.target.value);
-              setBody("");
-              setValues({});
-              setPreview("");
-              setFileId("");
+              clearSource();
             }}
           >
             <MenuItem value="">Select a template</MenuItem>
@@ -147,12 +164,12 @@ export default function Generator() {
           <TextField
             select
             label="Source record type"
+            disabled={busy}
             value={sourceModule}
             onChange={(e) => {
               setSourceModule(e.target.value);
               setSourceId("");
-              setPreview("");
-              setValues({});
+              clearSource();
             }}
           >
             {[
@@ -176,19 +193,24 @@ export default function Generator() {
               source: sourceModule,
               required: true,
             }}
+            disabled={busy}
             value={sourceId}
             root={{}}
             onChange={(v) => {
               setSourceId(String(v));
-              setPreview("");
-              setValues({});
+              clearSource();
             }}
           />
           <TextField
             select
             label="Output format"
+            disabled={busy}
             value={format}
-            onChange={(e) => setFormat(e.target.value)}
+            onChange={(e) => {
+              setFormat(e.target.value);
+              setFileId("");
+              setMessage("");
+            }}
           >
             {["DOCX", "PDF", "XLSX", "ZIP"].map((f) => (
               <MenuItem key={f} value={f}>
@@ -206,11 +228,14 @@ export default function Generator() {
           {fields.map((key) => (
             <TextField
               key={key}
+              disabled={busy}
               label={key.replace(/_/g, " ")}
               value={values[key] ?? ""}
               onChange={(e) => {
                 setValues((v) => ({ ...v, [key]: e.target.value }));
                 setPreview("");
+                setFileId("");
+                setMessage("");
               }}
               multiline
               minRows={1}
@@ -219,7 +244,11 @@ export default function Generator() {
           {Boolean(body) && (
             <Paper sx={{ p: 2, bgcolor: "#f5f8f9" }}>
               <Typography variant="subtitle2">Draft preview</Typography>
-              <Typography component="pre" variant="body2">
+              <Typography
+                component="pre"
+                variant="body2"
+                sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+              >
                 {body.replace(
                   /{{\s*(\w+)\s*}}/g,
                   (_, key: string) => values[key] || `[Complete ${key}]`,
@@ -250,10 +279,15 @@ export default function Generator() {
                     type: "multi",
                     source: "documents",
                   }}
+                  disabled={busy}
                   value={companyDocumentIds}
                   root={{}}
                   multiple
-                  onChange={(v) => setCompanyDocumentIds(v as string[])}
+                  onChange={(v) => {
+                    setCompanyDocumentIds(v as string[]);
+                    setFileId("");
+                    setMessage("");
+                  }}
                 />
                 <Button
                   onClick={() => void bundle()}

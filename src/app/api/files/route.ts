@@ -68,6 +68,7 @@ export async function POST(req: Request) {
     if (!parent) throw new AppError(404, "Linked record not found");
     const file = form.get("file");
     if (!(file instanceof File)) throw new AppError(400, "Choose a file");
+    const name = path.basename(file.name).slice(0, 200);
     if (file.size > MAX_UPLOAD) throw new AppError(413, "File limit is 4 MB");
     const bytes = Buffer.from(await file.arrayBuffer());
     validateUpload(file.name, file.type, bytes);
@@ -81,13 +82,13 @@ export async function POST(req: Request) {
       const metadata = await db.$transaction(
         async (tx) => {
           const previous = await tx.storedFile.findFirst({
-            where: { module: resource, recordId, name: file.name },
+            where: { module: resource, recordId, name },
             orderBy: { version: "desc" },
           });
           const record = await tx.storedFile.create({
             data: {
               ...saved,
-              name: path.basename(file.name).slice(0, 200),
+              name,
               mime: file.type,
               size: file.size,
               module: resource,

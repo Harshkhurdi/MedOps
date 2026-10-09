@@ -215,12 +215,18 @@ export async function managementReport(
           where: {
             customerId,
             ...date("createdAt"),
-            ...(manufacturerId ? { items: { some: { manufacturerId } } } : {}),
+            ...(manufacturerId || productId
+              ? { items: { some: { manufacturerId, productId } } }
+              : {}),
           },
           include: {
-            items: true,
-            results: { orderBy: { resultDate: "desc" }, take: 1 },
-            decisions: { orderBy: { decisionAt: "asc" } },
+            items: { where: { manufacturerId, productId } },
+            results: canResource(user, "results")
+              ? { orderBy: { resultDate: "desc" }, take: 1 }
+              : false,
+            decisions: canResource(user, "decisions")
+              ? { orderBy: { decisionAt: "asc" } }
+              : false,
             customer: true,
           },
           take: bound + 1,
@@ -263,10 +269,15 @@ export async function managementReport(
           where: {
             customerId,
             ...date("poDate"),
-            ...(manufacturerId ? { items: { some: { manufacturerId } } } : {}),
+            ...(manufacturerId || productId
+              ? { items: { some: { manufacturerId, productId } } }
+              : {}),
           },
           include: {
-            items: { include: { manufacturer: true, product: true } },
+            items: {
+              where: { manufacturerId, productId },
+              include: { manufacturer: true, product: true },
+            },
             customer: true,
           },
           take: bound + 1,
@@ -357,28 +368,29 @@ export async function managementReport(
   const submitted = tenders.filter((t) =>
       ["SUBMITTED", "WON", "LOST"].includes(t.status),
     ),
-    wins = tenders.filter((t) => t.results[0]?.outcome === "WON"),
-    losses = tenders.filter((t) => t.results[0]?.outcome === "LOST");
+    wins = tenders.filter((t) => t.results?.[0]?.outcome === "WON"),
+    losses = tenders.filter((t) => t.results?.[0]?.outcome === "LOST");
   const lossReasons: Record<string, number> = {};
   for (const t of losses) {
-    const key = t.results[0]?.reason ?? "UNKNOWN";
+    const key = t.results?.[0]?.reason ?? "UNKNOWN";
     lossReasons[key] = (lossReasons[key] ?? 0) + 1;
   }
   const cards: Record<string, string | number | null> = {};
   if (canResource(user, "tenders"))
     Object.assign(cards, {
       underReview: tenders.filter((t) => t.status === "UNDER_REVIEW").length,
-      pursuedTenders: tenders.filter(
-        (t) => t.decisions.at(-1)?.decision === "PURSUE",
-      ).length,
+      pursuedTenders: canResource(user, "decisions")
+        ? tenders.filter((t) => t.decisions?.at(-1)?.decision === "PURSUE")
+            .length
+        : null,
       submittedTenders: submitted.length,
-      wins: wins.length,
-      losses: losses.length,
+      wins: canResource(user, "results") ? wins.length : null,
+      losses: canResource(user, "results") ? losses.length : null,
       submissionRate: tenders.length
         ? +((submitted.length * 100) / tenders.length).toFixed(2)
         : null,
       winRate:
-        wins.length + losses.length
+        canResource(user, "results") && wins.length + losses.length
           ? +((wins.length * 100) / (wins.length + losses.length)).toFixed(2)
           : null,
     });
@@ -529,13 +541,13 @@ export async function managementReport(
       manufacturer: m.name,
       opportunities: pipeline.filter((p) => p.manufacturerId === m.id).length,
       pursuedTenders: ts.filter(
-        (t) => t.decisions.at(-1)?.decision === "PURSUE",
+        (t) => t.decisions?.at(-1)?.decision === "PURSUE",
       ).length,
       submitted: ts.filter((t) =>
         ["SUBMITTED", "WON", "LOST"].includes(t.status),
       ).length,
-      wins: ts.filter((t) => t.results[0]?.outcome === "WON").length,
-      losses: ts.filter((t) => t.results[0]?.outcome === "LOST").length,
+      wins: ts.filter((t) => t.results?.[0]?.outcome === "WON").length,
+      losses: ts.filter((t) => t.results?.[0]?.outcome === "LOST").length,
       orderValue: money(
         orders
           .flatMap((o) => o.items.filter((i) => i.manufacturerId === m.id))
@@ -657,11 +669,14 @@ export async function managementReport(
     );
   }
   if (canResource(user, "payments")) {
-    const monthStart = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    // Payment dates are stored as calendar dates at UTC midnight. Choose the
+    // current month in India before building those calendar-date boundaries.
+    const indiaNow = new Date(+now + 19800000),
+      monthStart = new Date(
+        Date.UTC(indiaNow.getUTCFullYear(), indiaNow.getUTCMonth(), 1),
       ),
       nextMonth = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+        Date.UTC(indiaNow.getUTCFullYear(), indiaNow.getUTCMonth() + 1, 1),
       );
     const payments = await bounded(
       db.payment.findMany({
@@ -709,10 +724,10 @@ export async function managementReport(
       manufacturerId: p.manufacturerId,
       opportunities: pipeline.filter((o) => o.productId === p.id).length,
       pursuedTenders: ts.filter(
-        (t) => t.decisions.at(-1)?.decision === "PURSUE",
+        (t) => t.decisions?.at(-1)?.decision === "PURSUE",
       ).length,
-      wins: ts.filter((t) => t.results[0]?.outcome === "WON").length,
-      losses: ts.filter((t) => t.results[0]?.outcome === "LOST").length,
+      wins: ts.filter((t) => t.results?.[0]?.outcome === "WON").length,
+      losses: ts.filter((t) => t.results?.[0]?.outcome === "LOST").length,
       orderValue: money(
         lines.reduce(
           (s, i) => s + cents(String(i.unitPrice)) * BigInt(i.quantity),
@@ -754,8 +769,8 @@ export async function managementReport(
     productMetrics: protectMetrics(productMetrics, {
       opportunities: "pipeline",
       pursuedTenders: "decisions",
-      wins: "tenders",
-      losses: "tenders",
+      wins: "results",
+      losses: "results",
       orderValue: "orders",
       unitsSold: "orders",
       installedUnits: "equipment",
@@ -785,8 +800,8 @@ export async function managementReport(
       opportunities: "pipeline",
       pursuedTenders: "decisions",
       submitted: "tenders",
-      wins: "tenders",
-      losses: "tenders",
+      wins: "results",
+      losses: "results",
       orderValue: "orders",
       operationalRevenue: "invoices",
       recordedContribution: ["costs", "invoices"],

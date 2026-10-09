@@ -1,7 +1,9 @@
 import { AppError } from "./errors";
 export function cents(value: string | number) {
   const s = String(value);
-  if (!/^\d{1,12}(\.\d{1,2})?$/.test(s))
+  // Stored calculated totals may exceed the 12-digit input fields. Decimal(18,2)
+  // supports 16 whole digits; keep all persisted amounts readable exactly.
+  if (!/^\d{1,16}(\.\d{1,2})?$/.test(s))
     throw new AppError(
       400,
       "Use a positive amount with at most two decimal places",
@@ -15,13 +17,14 @@ export function money(value: bigint) {
 export function orderTotal(
   items: { quantity: number; unitPrice: string; taxRate: string }[],
 ) {
-  return money(
-    items.reduce((sum, item) => {
-      const subtotal = cents(item.unitPrice) * BigInt(item.quantity);
-      const tax = (subtotal * cents(item.taxRate) + 5000n) / 10000n;
-      return sum + subtotal + tax;
-    }, 0n),
-  );
+  const total = items.reduce((sum, item) => {
+    const subtotal = cents(item.unitPrice) * BigInt(item.quantity);
+    const tax = (subtotal * cents(item.taxRate) + 5000n) / 10000n;
+    return sum + subtotal + tax;
+  }, 0n);
+  if (total > 999999999999999999n)
+    throw new AppError(400, "Order exceeds the supported amount range");
+  return money(total);
 }
 export function outstanding(total: string, receipts: { amount: string }[]) {
   return money(

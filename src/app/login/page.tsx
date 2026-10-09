@@ -94,8 +94,8 @@ export default function Login() {
             </Stack>
           </form>
           <Typography variant="caption" color="text.secondary">
-            Company records stay private. AI features and external data
-            processing are disabled.
+            Company records stay private. Optional AI processes only text you
+            explicitly enter and approve.
           </Typography>
         </Stack>
       </Paper>

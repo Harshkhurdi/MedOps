@@ -11,7 +11,10 @@ export default defineConfig({
   },
   globalSetup: "./tests/e2e/setup.ts",
   webServer: {
-    command: "npm run dev",
+    command:
+      process.env.MEDOPS_E2E_PRODUCTION === "1"
+        ? "npm run start"
+        : "npm run dev",
     url: "http://localhost:3000/login",
     reuseExistingServer: false,
     timeout: 120000,
