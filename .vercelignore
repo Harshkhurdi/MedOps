@@ -9,7 +9,7 @@ node_modules/
 .next/
 test-results/
 playwright-report/
-coverage/
+/coverage/
 *.log
 *.tsbuildinfo
 tests/
