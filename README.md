@@ -4,6 +4,10 @@ Private medical equipment dealership operations: tender documentation → offici
 
 **Core workflows never depend on AI.** Optional OpenRouter assistance processes only text an employee explicitly enters and approves for each request. Stored documents and business records are never attached. AI starts disabled, with no key stored in the database or browser. No company-data telemetry, third-party analytics, external conversion service, or public document storage exists. Tender Tracker remains a separate application with an optional, employee-confirmed one-way tender handoff. Neither application shares a database or business document store.
 
+## Complete user guide
+
+Start with the [complete MedOps user guide](docs/USER_GUIDE.md) for first sign-in, administrator setup, every commercial/operations/service/finance/CRM workflow, optional services, troubleshooting and the full field reference for all 51 registers. It includes a worked example and instructions for all 18 dedicated screens and 492 top-level form fields.
+
 ## Stack and organization
 
 Next.js 16 App Router, TypeScript, Material UI, server-side Route Handlers, PostgreSQL, Prisma 7, Zod, database sessions, private Vercel Blob, DOCX, ExcelJS, native PDF rendering, Vitest and Playwright.
